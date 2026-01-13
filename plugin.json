@@ -1,0 +1,29 @@
+{
+    "$schema": "https://go.kicad.org/api/schemas/v1",
+    "identifier": "com.github.bakery",
+    "name": "Bakery",
+    "description": "Localize all KiCad symbols, footprints, and 3D models to project libraries",
+    "runtime": {
+        "type": "python",
+        "min_version": "3.8"
+    },
+    "actions": [
+        {
+            "identifier": "localize",
+            "name": "Localize Symbols, Footprints, and 3D Models",
+            "description": "Automates the process of copying global library symbols, footprints, and 3D models into project-local libraries, eliminating external dependencies and ensuring project portability",
+            "show-button": true,
+            "scopes": [
+                "pcb",
+                "schematic"
+            ],
+            "entrypoint": "__init__.py",
+            "icons-light": [
+                "Bakery_Icon.png"
+            ],
+            "icons-dark": [
+                "Bakery_Icon.png"
+            ]
+        }
+    ]
+}

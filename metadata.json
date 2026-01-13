@@ -1,0 +1,26 @@
+{
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "name": "Bakery",
+    "description": "Bakery plugin for KiCad",
+    "description_full": "Localize all KiCad symbols, footprints, and 3D models to project libraries",
+    "identifier": "com.github.bakery",
+    "type": "plugin",
+    "author": {
+        "name": "Adrian West",
+        "contact": {
+            "web": "https://github.com/AdrianWest/Bakery"
+        }
+    },
+    "license": "GNU V3",
+    "resources": {
+        "homepage": "https://github.com/AdrianWest/Bakery"
+    },
+    "versions": [
+        {
+            "version": "1.0.0",
+            "status": "stable",
+            "kicad_version": "9.0",
+            "download_url": "https://github.com/AdrianWest/Bakery/archive/refs/heads/main.zip"
+        }
+    ]
+}

@@ -14,15 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File-level docstrings with @file, @brief, and @section tags
 - Class-level docstrings with @section methods and @section attributes
 - Utility module (utils.py) for shared functionality
+- KiCad Plugin Manager (PCM) release checklist (PCM_RELEASE_CHECKLIST.md)
+- High-resolution plugin icon (256x256 pixels)
 
 ### Changed
 - Updated all class docstrings to use Doxygen format with `!` marker
 - Enhanced documentation with detailed descriptions and notes sections
 - Improved project structure documentation in README
 - Updated roadmap to reflect symbol localization as implemented
+- Updated metadata.json for KiCad PCM compliance:
+  - Changed identifier to proper reverse-domain format (com.github.adrianwest.bakery)
+  - Updated license to standard identifier (GPL-3.0)
+  - Added comprehensive description and tags
+  - Added repository URL and version compatibility range
+  - Added placeholders for download hash and file sizes
+- Plugin icon changed from Bakery_Icon.png to Bakery_Icon_256x256.png for better quality
+- Updated install.bat to copy new 256x256 icon
 
 ### Fixed
-- Missing imports for KICAD_ENV_FOOTPRINT_DIR, KICAD_ENV_3DMODEL_DIR, KICAD_ENV_SYMBOL_DIR in library_manager.py
+- Missing constant imports in library_manager.py:
+  - KICAD_ENV_FOOTPRINT_DIR, KICAD_ENV_3DMODEL_DIR, KICAD_ENV_SYMBOL_DIR
+  - KICAD_VERSION_FALLBACK
+- Missing constant imports in symbol_localizer.py:
+  - PROGRESS_STEP_COPY_SYMBOLS
+  - PROGRESS_STEP_UPDATE_SYM_LIB_TABLE
+- Missing constant imports in footprint_localizer.py:
+  - PROGRESS_STEP_SCAN_PCB, PROGRESS_STEP_SCAN_SCHEMATICS
+  - PROGRESS_STEP_COPY_3D_MODELS
+  - PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS
+  - ENV_VAR_KIPRJMOD
 - README now accurately reflects current implementation (symbols fully implemented)
 
 ## [1.0.0] - 2026-01-11

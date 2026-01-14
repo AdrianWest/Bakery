@@ -1,9 +1,9 @@
 {
     "$schema": "https://go.kicad.org/pcm/schemas/v1",
     "name": "Bakery",
-    "description": "Bakery plugin for KiCad",
-    "description_full": "Localize all KiCad symbols, footprints, and 3D models to project libraries",
-    "identifier": "com.github.bakery",
+    "description": "Localize KiCad symbols, footprints, and 3D models to project libraries",
+    "description_full": "Bakery automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures project portability by eliminating external library dependencies and provides version stability by preventing changes when global libraries are updated. Features include dual scanning of PCB and schematic files, automatic backup creation, progress tracking with detailed logging, and support for both KiCad 8 and 9.",
+    "identifier": "com.github.adrianwest.bakery",
     "type": "plugin",
     "author": {
         "name": "Adrian West",
@@ -11,16 +11,23 @@
             "web": "https://github.com/AdrianWest/Bakery"
         }
     },
-    "license": "GNU V3",
+    "license": "GPL-3.0",
     "resources": {
-        "homepage": "https://github.com/AdrianWest/Bakery"
+        "homepage": "https://github.com/AdrianWest/Bakery",
+        "repository": "https://github.com/AdrianWest/Bakery"
     },
+    "tags": ["pcbnew", "library", "symbols", "footprints", "localization", "3d-models", "project-management"],
+    "keep_on_update": [],
     "versions": [
         {
             "version": "1.0.0",
-            "status": "stable",
+            "status": "testing",
             "kicad_version": "9.0",
-            "download_url": "https://github.com/AdrianWest/Bakery/archive/refs/heads/main.zip"
+            "kicad_version_max": "9.99",
+            "download_url": "https://github.com/AdrianWest/Bakery/releases/download/v1.0.0/Bakery-1.0.0.zip",
+            "download_sha256": "TO_BE_CALCULATED_AFTER_RELEASE",
+            "download_size": 100000,
+            "install_size": 200000
         }
     ]
 }

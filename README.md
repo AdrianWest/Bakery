@@ -137,7 +137,7 @@ Contributions welcome! Please open an issue or pull request.
 
 ## Roadmap
 
-### Version 1.0 (Released)
+### Version 1.0 (In Development - Unreleased)
 - [x] Symbol localization from global to project libraries
 - [x] Footprint localization from global to project libraries
 - [x] 3D model localization with path updates
@@ -148,6 +148,8 @@ Contributions welcome! Please open an issue or pull request.
 - [x] Symbol and footprint library table management
 - [x] Automatic timestamped backup creation
 - [x] KiCad 8 & 9 environment variable compatibility
+- [x] Comprehensive Doxygen documentation
+- [ ] Full testing and bug fixes
 
 ### Planned for Future Versions
 - [ ] Support for hierarchical schematics

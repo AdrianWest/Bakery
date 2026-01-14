@@ -15,12 +15,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file bakery_plugin.py
+
 @brief Main plugin module for Bakery KiCad Plugin
 
 Provides the ActionPlugin interface for KiCad integration. Coordinates the
 localization process for footprints, symbols, and 3D models using specialized
 manager classes.
+
+@section description_bakery_plugin Detailed Description
+This module implements the BakeryPlugin class which serves as the entry point
+for the KiCad plugin system. It orchestrates the complete localization workflow
+by coordinating FootprintLocalizer, SymbolLocalizer, and LibraryManager components.
+
+@section notes_bakery_plugin Notes
+- Registered as KiCad ActionPlugin via pcbnew.ActionPlugin interface
+- Requires KiCad 8.0 or later
+- Must be installed in KiCad's scripting/plugins directory
 """
 
 import os
@@ -48,11 +60,21 @@ from .library_manager import LibraryManager
 
 
 class BakeryPlugin(pcbnew.ActionPlugin):
-    """
-    @brief Main plugin class for Bakery - localizes KiCad footprints and 3D models
+    """!
+    @brief Main plugin class for Bakery - localizes KiCad symbols, footprints, and 3D models
     
     Provides ActionPlugin interface for KiCad integration. Coordinates the
     localization process using specialized manager classes.
+    
+    @section methods Methods
+    - :py:meth:`~BakeryPlugin.__init__`
+    - :py:meth:`~BakeryPlugin.defaults`
+    - :py:meth:`~BakeryPlugin.Run`
+    - :py:meth:`~BakeryPlugin.run_localization`
+    
+    @section attributes Attributes
+    - logger (BakeryLogger): Logger window instance
+    - config (dict): Configuration dictionary with library names and options
     """
     
     def __init__(self):

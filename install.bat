@@ -37,7 +37,7 @@ copy /Y "%~dp0ui_components.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0backup_manager.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0constants.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0utils.py" "%KICAD_PLUGINS_DIR%\"
-copy /Y "%~dp0plugin.json" "%KICAD_PLUGINS_DIR%\"
+copy /Y "%~dp0metadata.json" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0Bakery_Icon.png" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0LICENSE" "%KICAD_PLUGINS_DIR%\"
 

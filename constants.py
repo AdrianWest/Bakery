@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file constants.py
+
 @brief Configuration constants for Bakery KiCad Plugin
 
 This module defines all constants used throughout the plugin including:
@@ -27,7 +29,18 @@ This module defines all constants used throughout the plugin including:
 - S-expression keywords
 - Error/success/confirmation messages
 - Configuration keys
+
+@section description_constants Detailed Description
+Centralized constant definitions for the entire Bakery plugin. All configuration
+values, UI strings, file extensions, and KiCad-specific keywords are defined here
+to maintain consistency and simplify maintenance.
+
+@section notes_constants Notes
+- Update PLUGIN_VERSION when releasing new versions
+- UI strings support future internationalization
+- KiCad version compatibility handled via environment variable mappings
 """
+
 
 # Plugin metadata
 PLUGIN_VERSION = "0.2.0"

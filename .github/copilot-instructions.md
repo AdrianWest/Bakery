@@ -49,8 +49,27 @@ Bakery KiCad Plugin
 - KiCad API objects use KiCad's naming (e.g., `GetBoard()`, `GetFootprints()`)
 
 ### Docstring Format (Doxygen Style)
-Use Doxygen-style docstrings for all classes, functions, and methods:
+Use Doxygen-style docstrings for all modules, classes, functions, and methods:
 
+**File/Module Level Docstring:**
+```python
+"""!
+@file example_file.py
+
+@brief A brief description of the file.
+
+This file demonstrates how to document a Python script using Doxygen-compatible
+docstrings. It includes documentation for the module itself, a function, and parameters.
+
+@section description_main Detailed Description
+More detailed description of the file and its purpose.
+
+@section notes_main Notes
+- Any special notes or considerations.
+"""
+```
+
+**Function Docstring:**
 ```python
 def copy_footprint(source_path, dest_path, footprint_name):
     """
@@ -66,24 +85,37 @@ def copy_footprint(source_path, dest_path, footprint_name):
     @throws PermissionError if cannot write to destination
     """
     pass
+```
 
-class SymbolLocalizer:
-    """
-    @brief Handles localization of schematic symbols from global to local libraries
-    
-    Scans .kicad_sch files, identifies external symbol references, and copies
-    them to project-local .kicad_sym files.
+**Class Docstring:**
+```python
+class DoxygenExample:
+    """!
+    @brief A simple example class to demonstrate Doxygen documentation in Python.
+
+    This class provides a basic illustration of how to format docstrings
+    for integration with the Doxygen documentation generator.
+
+    @section methods Methods
+    - :py:meth:`~DoxygenExample.__init__`
+    - :py:meth:`~DoxygenExample.calculate_sum`
+
+    @section attributes Attributes
+    - value1 (int): The first value.
+    - value2 (int): The second value.
     """
     pass
 ```
 
 **Doxygen Tags to Use:**
+- `@file` - File name (use at top of file)
 - `@brief` - Short description (first line)
 - `@param` - Parameter description
 - `@return` - Return value description
 - `@throws` / `@exception` - Exceptions that may be raised
 - `@note` - Additional notes or warnings
 - `@see` - Cross-references to related functions/classes
+- `@section` - Define sections within documentation
 
 ### Error Handling
 - Use try/except for KiCad API calls (can fail if board/schematic not loaded)

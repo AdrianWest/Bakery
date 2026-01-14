@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file sexpr_parser.py
+
 @brief S-expression parser for KiCad file formats
 
 This module provides parsing and serialization of S-expressions used in KiCad files.
@@ -24,6 +26,17 @@ Supports:
 - Formatting S-expressions back to text with proper indentation
 - Caching for performance optimization
 - Special formatting for KiCad-specific structures (symbols, libraries, etc.)
+
+@section description_sexpr_parser Detailed Description
+The SExpressionParser class provides efficient parsing and serialization of
+KiCad's S-expression file format. It includes a caching mechanism to improve
+performance when parsing the same content multiple times, and special formatters
+for symbol libraries and symbol definitions to maintain KiCad's expected formatting.
+
+@section notes_sexpr_parser Notes
+- Uses LRU cache for parsed results to improve performance
+- Handles nested parentheses and quoted strings correctly
+- Preserves KiCad formatting conventions for symbols and libraries
 """
 
 from typing import List, Union, Any, Optional
@@ -37,11 +50,26 @@ MAX_CACHE_SIZE = 100
 
 
 class SExpressionParser:
-    """
+    """!
     @brief Parser for KiCad S-expression format
     
     Provides methods to parse S-expression text into nested Python structures
     and format them back to text with proper indentation.
+    
+    @section methods Methods
+    - :py:meth:`~SExpressionParser.__init__`
+    - :py:meth:`~SExpressionParser.parse`
+    - :py:meth:`~SExpressionParser.to_string`
+    - :py:meth:`~SExpressionParser.find_footprints`
+    - :py:meth:`~SExpressionParser.find_3d_models`
+    - :py:meth:`~SExpressionParser.find_library_path`
+    - :py:meth:`~SExpressionParser.clear_cache`
+    - :py:meth:`~SExpressionParser._format_symbol_lib`
+    - :py:meth:`~SExpressionParser._format_symbol`
+    
+    @section attributes Attributes
+    - cache (dict): Cache of parsed S-expressions for performance
+    - max_cache_size (int): Maximum number of cached parse results
     """
     
     def __init__(self, max_cache_size: int = MAX_CACHE_SIZE):

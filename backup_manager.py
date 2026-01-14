@@ -15,11 +15,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file backup_manager.py
+
 @brief File backup management for Bakery plugin
 
 Provides functionality for creating timestamped backups of files before
 modification. Maintains a list of all backups created during a session.
+
+@section description_backup_manager Detailed Description
+The BackupManager class handles creation of timestamped backup copies of
+files before the plugin modifies them. This allows users to restore their
+original files if needed. All backup operations are logged and tracked.
+
+@section notes_backup_manager Notes
+- Backup files use .backup-YYYYMMDD-HHMMSS suffix
+- All created backups are tracked and can be retrieved
+- Backup operations include error handling and logging
 """
 
 import os
@@ -31,8 +43,20 @@ from .constants import BACKUP_SUFFIX, BACKUP_TIMESTAMP_FORMAT, ERROR_BACKUP_FAIL
 
 
 class BackupManager:
-    """
+    """!
     @brief Manages file backups before modifications
+    
+    Creates timestamped backups of files before they are modified by the plugin.
+    
+    @section methods Methods
+    - :py:meth:`~BackupManager.__init__`
+    - :py:meth:`~BackupManager.log`
+    - :py:meth:`~BackupManager.create_backup`
+    - :py:meth:`~BackupManager.get_backups`
+    
+    @section attributes Attributes
+    - logger (Callable): Logger object with info/warning/error methods
+    - backups (list): List of created backup file paths
     """
     
     def __init__(self, logger: Optional[Callable] = None):

@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file footprint_localizer.py
+
 @brief Footprint localization for Bakery plugin
 
 Handles localization of PCB footprints and 3D models:
@@ -23,6 +25,17 @@ Handles localization of PCB footprints and 3D models:
 - Copying footprints to local project libraries
 - Localizing 3D model files
 - Updating footprint references in PCB and schematics
+
+@section description_footprint_localizer Detailed Description
+This module provides the FootprintLocalizer class which manages footprint and
+3D model localization. It scans both PCB (.kicad_pcb) and schematic (.kicad_sch)
+files to find all footprint references, copies .kicad_mod files to local .pretty
+libraries, and localizes associated 3D models (STEP, WRL, etc.).
+
+@section notes_footprint_localizer Notes
+- Scans both PCB and schematic files for comprehensive coverage
+- Preserves 3D model file formats and structure
+- Updates model paths to use ${KIPRJMOD} variable
 """
 
 import os
@@ -46,11 +59,27 @@ from .utils import (
 
 
 class FootprintLocalizer:
-    """
+    """!
     @brief Handles localization of footprints and 3D models from global to local libraries
     
     Scans PCB and schematic files, identifies external footprint references, copies
     them to project-local libraries, and updates all references.
+    
+    @section methods Methods
+    - :py:meth:`~FootprintLocalizer.__init__`
+    - :py:meth:`~FootprintLocalizer.log`
+    - :py:meth:`~FootprintLocalizer.scan_pcb_footprints`
+    - :py:meth:`~FootprintLocalizer.scan_schematic_footprints`
+    - :py:meth:`~FootprintLocalizer.copy_footprints`
+    - :py:meth:`~FootprintLocalizer.localize_3d_models`
+    - :py:meth:`~FootprintLocalizer.update_pcb_references`
+    - :py:meth:`~FootprintLocalizer.update_schematic_references`
+    
+    @section attributes Attributes
+    - logger (Callable): Logger object with info/warning/error methods
+    - parser (SExpressionParser): S-expression parser instance
+    - lib_manager (LibraryManager): Library manager instance
+    - backup_manager (BackupManager): File backup manager instance
     """
     
     def __init__(self, logger: Optional[Callable] = None):

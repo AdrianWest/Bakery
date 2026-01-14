@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file symbol_localizer.py
+
 @brief Symbol localization for Bakery plugin
 
 Handles localization of schematic symbols:
@@ -23,6 +25,17 @@ Handles localization of schematic symbols:
 - Copying symbols from global to local libraries
 - Updating symbol library tables
 - Updating symbol references in schematics
+
+@section description_symbol_localizer Detailed Description
+This module provides the SymbolLocalizer class which manages the complete
+lifecycle of symbol localization from global KiCad libraries to project-local
+libraries. It parses .kicad_sch files, extracts symbol definitions from global
+.kicad_sym libraries, and creates consolidated local symbol libraries.
+
+@section notes_symbol_localizer Notes
+- Supports KiCad 8 and 9 environment variable formats
+- Handles both absolute and relative library paths
+- Creates backups before modifying schematic files
 """
 
 import os
@@ -48,11 +61,30 @@ from .utils import (
 
 
 class SymbolLocalizer:
-    """
+    """!
     @brief Handles localization of symbols from global to local libraries
     
     Scans schematic files, identifies external symbol references, copies
     them to project-local symbol libraries, and updates all references.
+    
+    @section methods Methods
+    - :py:meth:`~SymbolLocalizer.__init__`
+    - :py:meth:`~SymbolLocalizer.log`
+    - :py:meth:`~SymbolLocalizer.scan_schematic_symbols`
+    - :py:meth:`~SymbolLocalizer.find_symbols_in_sexpr`
+    - :py:meth:`~SymbolLocalizer.copy_symbols`
+    - :py:meth:`~SymbolLocalizer.get_symbols_in_library`
+    - :py:meth:`~SymbolLocalizer.extract_symbol_from_library`
+    - :py:meth:`~SymbolLocalizer.find_symbol_library_path`
+    - :py:meth:`~SymbolLocalizer.expand_path`
+    - :py:meth:`~SymbolLocalizer.write_symbol_library`
+    - :py:meth:`~SymbolLocalizer.update_schematic_references`
+    - :py:meth:`~SymbolLocalizer.update_sym_lib_table`
+    
+    @section attributes Attributes
+    - logger (Callable): Logger object with info/warning/error methods
+    - parser (SExpressionParser): S-expression parser instance
+    - backup_manager (BackupManager): File backup manager instance
     """
     
     def __init__(self, logger: Optional[Callable] = None):

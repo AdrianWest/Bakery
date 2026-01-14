@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file library_manager.py
+
 @brief Library management for Bakery plugin
 
 Handles creation and management of KiCad footprint and symbol libraries:
@@ -23,29 +25,55 @@ Handles creation and management of KiCad footprint and symbol libraries:
 - Finding library paths in global tables
 - Updating fp-lib-table and sym-lib-table files
 - Path validation and environment variable expansion
+
+@section description_library_manager Detailed Description
+This module provides the LibraryManager class which handles all library-related
+operations including creating local .pretty directories, managing fp-lib-table
+entries, resolving library paths from global tables, and expanding KiCad
+environment variables.
+
+@section notes_library_manager Notes
+- Supports both KiCad 8 and 9 environment variable naming conventions
+- Handles ${KIPRJMOD}, ${KICAD8_3DMODEL_DIR}, ${KICAD_3DMODEL_DIR}
+- Validates library paths before operations
 """
 
 import os
 import re
-from typing import Optional, Callable
+from typing import Dict, Optional, Callable
 
 from .constants import (
     KICAD_VERSIONS, ENV_VAR_KIPRJMOD, ENV_VAR_PREFIX_PRIMARY,
     ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC, EXTENSION_FOOTPRINT_LIB,
     EXTENSION_FP_LIB_TABLE, SEXPR_FP_LIB_TABLE, SEXPR_LIB, SEXPR_NAME,
     SEXPR_TYPE, SEXPR_URI, SEXPR_OPTIONS, SEXPR_DESCR, LIBRARY_TYPE_KICAD,
-    KICAD_VERSION_PRIMARY
+    KICAD_VERSION_PRIMARY, KICAD_ENV_FOOTPRINT_DIR, KICAD_ENV_3DMODEL_DIR,
+    KICAD_ENV_SYMBOL_DIR
 )
 from .sexpr_parser import SExpressionParser
 from .utils import validate_library_name, validate_path_safety, expand_kicad_path
 
 
 class LibraryManager:
-    """
+    """!
     @brief Manages creation and updates of local KiCad libraries
     
     Handles footprint and symbol library creation, fp-lib-table updates,
     and library path resolution.
+    
+    @section methods Methods
+    - :py:meth:`~LibraryManager.__init__`
+    - :py:meth:`~LibraryManager.log`
+    - :py:meth:`~LibraryManager.expand_kicad_env_vars`
+    - :py:meth:`~LibraryManager.expand_path`
+    - :py:meth:`~LibraryManager.create_local_footprint_library`
+    - :py:meth:`~LibraryManager.find_footprint_library_path`
+    - :py:meth:`~LibraryManager.update_fp_lib_table`
+    
+    @section attributes Attributes
+    - logger (Callable): Logger object with info/warning/error methods
+    - parser (SExpressionParser): S-expression parser instance
+    - env_vars (dict): Dictionary of expanded KiCad environment variables
     """
     
     def __init__(self, logger: Optional[Callable] = None):

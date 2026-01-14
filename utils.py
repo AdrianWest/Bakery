@@ -15,13 +15,25 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file utils.py
+
 @brief Utility functions shared across Bakery plugin modules
 
 This module provides common utilities for:
 - Path expansion and validation
 - File operations with safety checks
 - Input validation
+
+@section description_utils Detailed Description
+This module contains shared utility functions used throughout the Bakery plugin.
+It provides safe file reading, path expansion with environment variables,
+schematic file discovery, and library table management functions.
+
+@section notes_utils Notes
+- All file operations include error handling
+- Path validation prevents directory traversal attacks
+- Supports both KiCad 8 and 9 environment variable formats
 """
 
 import os

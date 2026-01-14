@@ -15,12 +15,25 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-"""
+"""!
+@file ui_components.py
+
 @brief User interface components for Bakery plugin
 
 Provides wxPython-based UI components:
 - ConfigDialog: Configuration dialog for plugin settings
 - BakeryLogger: Progress window with logging and status display
+
+@section description_ui_components Detailed Description
+This module implements the wxPython-based user interface for the Bakery plugin.
+ConfigDialog allows users to configure library names and options before running
+the localization process. BakeryLogger provides real-time progress updates with
+separate panes for info, warning, and error messages.
+
+@section notes_ui_components Notes
+- Requires wxPython (bundled with KiCad)
+- Gracefully handles missing wx module for development environments
+- Logger window supports both modeless (during operation) and modal (at completion) modes
 """
 
 from typing import Dict, Any
@@ -50,10 +63,19 @@ from .utils import validate_library_name
 
 
 class ConfigDialog(wx.Dialog):
-    """
+    """!
     @brief Configuration dialog for Bakery plugin settings
     
-    Allows users to customize library names and backup options.
+    Allows users to customize library names, directory names, and backup options.
+    
+    @section methods Methods
+    - :py:meth:`~ConfigDialog.__init__`
+    - :py:meth:`~ConfigDialog.on_ok`
+    - :py:meth:`~ConfigDialog.on_cancel`
+    - :py:meth:`~ConfigDialog.get_config`
+    
+    @section attributes Attributes
+    - config (dict): Configuration settings dictionary
     """
     
     def __init__(self, parent, config: Dict[str, Any]):
@@ -212,10 +234,29 @@ class ConfigDialog(wx.Dialog):
 
 
 class BakeryLogger(wx.Dialog):
-    """
+    """!
     @brief A logging window with progress bar for displaying progress during localization
     
     Provides a real-time log display with separate warning/error sections and progress tracking.
+    
+    @section methods Methods
+    - :py:meth:`~BakeryLogger.__init__`
+    - :py:meth:`~BakeryLogger.set_progress`
+    - :py:meth:`~BakeryLogger.log`
+    - :py:meth:`~BakeryLogger.info`
+    - :py:meth:`~BakeryLogger.warning`
+    - :py:meth:`~BakeryLogger.error`
+    - :py:meth:`~BakeryLogger.success`
+    - :py:meth:`~BakeryLogger.enable_close`
+    - :py:meth:`~BakeryLogger.on_close`
+    
+    @section attributes Attributes
+    - progress_bar (wx.Gauge): Progress bar control
+    - progress_label (wx.StaticText): Progress status label
+    - log_text (wx.TextCtrl): Main log text area
+    - warning_text (wx.TextCtrl): Warning messages text area
+    - error_text (wx.TextCtrl): Error messages text area
+    - close_button (wx.Button): Close button control
     """
     
     def __init__(self, parent, title="Bakery - Localization Log"):

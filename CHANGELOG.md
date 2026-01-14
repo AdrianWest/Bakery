@@ -5,6 +5,26 @@ All notable changes to the Bakery KiCad plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Symbol localization from global to project libraries
+- Symbol library table (sym-lib-table) management
+- Comprehensive Doxygen-style documentation for all modules and classes
+- File-level docstrings with @file, @brief, and @section tags
+- Class-level docstrings with @section methods and @section attributes
+- Utility module (utils.py) for shared functionality
+
+### Changed
+- Updated all class docstrings to use Doxygen format with `!` marker
+- Enhanced documentation with detailed descriptions and notes sections
+- Improved project structure documentation in README
+- Updated roadmap to reflect symbol localization as implemented
+
+### Fixed
+- Missing imports for KICAD_ENV_FOOTPRINT_DIR, KICAD_ENV_3DMODEL_DIR, KICAD_ENV_SYMBOL_DIR in library_manager.py
+- README now accurately reflects current implementation (symbols fully implemented)
+
 ## [1.0.0] - 2026-01-11
 
 ### Added
@@ -23,11 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modular design with separated concerns:
   - `bakery_plugin.py` - Main ActionPlugin interface
   - `footprint_localizer.py` - Footprint and 3D model operations
+  - `symbol_localizer.py` - Symbol localization operations
   - `library_manager.py` - Library table management
   - `sexpr_parser.py` - S-expression parsing utilities
   - `ui_components.py` - User interface components
   - `backup_manager.py` - File backup handling
   - `constants.py` - Configuration constants
+  - `utils.py` - Shared utility functions
 
 ### Fixed
 - License consistency (GPL-3.0 across all files)
@@ -36,19 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Path safety validation
 - Race conditions in file operations
 
-### Known Limitations
-- Symbol localization not yet implemented (planned for v2.0)
-- No support for hierarchical schematic sheets yet
-- Single project processing only (no batch mode)
+## [Planned for Future Versions]
 
-## [Unreleased]
-
-### Planned for v2.0
-- Symbol localization from global to project libraries
-- Hierarchical schematic support
-- Batch processing for multiple projects
-- Undo/rollback functionality
-- Advanced duplicate detection and merging
+- Support for hierarchical schematics
 
 ---
 

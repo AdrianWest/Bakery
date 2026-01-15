@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upfront schematic file lock checking before starting localization process
 - Completion dialog showing summary of copied items when process finishes
 - Helper methods in FootprintLocalizer: copy_single_model() and update_footprint_model_paths()
+- **Support for hierarchical schematics** - Recursively finds all .kicad_sch files in subdirectories
 
 ### Changed
 - Updated all class docstrings to use Doxygen format with `!` marker

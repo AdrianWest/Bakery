@@ -149,7 +149,8 @@ Contributions welcome! Please open an issue or pull request.
 - [x] Automatic timestamped backup creation
 - [x] KiCad 8 & 9 environment variable compatibility
 - [x] Comprehensive Doxygen documentation
+- [x] Support for hierarchical schematics
 - [ ] Full testing and bug fixes
 
 ### Planned for Future Versions
-- [ ] Support for hierarchical schematics
+- [ ] Additional features based on user feedback

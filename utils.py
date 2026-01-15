@@ -145,13 +145,18 @@ def safe_read_file(path: str, encoding: str = 'utf-8', max_size: Optional[int] =
 
 def find_schematic_files(project_dir: str) -> list:
     """
-    @brief Find all schematic files in project directory
+    @brief Find all schematic files in project directory including hierarchical sheets
     
     @param project_dir: Project directory path
-    @return List of schematic file paths
+    @return List of schematic file paths (sorted for consistency)
+    
+    Searches recursively for all .kicad_sch files to support hierarchical schematics.
+    Hierarchical sheets may be in subdirectories within the project.
     """
     import glob
-    return glob.glob(os.path.join(project_dir, "*.kicad_sch"))
+    # Search recursively for all .kicad_sch files (supports hierarchical schematics)
+    schematic_files = glob.glob(os.path.join(project_dir, "**", "*.kicad_sch"), recursive=True)
+    return sorted(schematic_files)  # Sort for consistent processing order
 
 
 def scan_schematics_for_items(

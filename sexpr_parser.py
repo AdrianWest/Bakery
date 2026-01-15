@@ -40,6 +40,7 @@ for symbol libraries and symbol definitions to maintain KiCad's expected formatt
 """
 
 from typing import List, Union, Any, Optional
+from collections import OrderedDict
 from .constants import (
     SEXPR_FP_LIB_TABLE, SEXPR_LIB, SEXPR_LIB_SYMBOLS, SEXPR_SYMBOL,
     SEXPR_PROPERTY, SEXPR_FOOTPRINT, SEXPR_MODEL, SEXPR_NAME, SEXPR_URI
@@ -78,7 +79,7 @@ class SExpressionParser:
         
         @param max_cache_size: Maximum number of cached parse results
         """
-        self.cache = {}
+        self.cache = OrderedDict()
         self.max_cache_size = max_cache_size
     
     def parse(self, text: str) -> Union[List, str]:
@@ -88,15 +89,18 @@ class SExpressionParser:
         @param text: S-expression text string
         @return Nested list/string structure representing the S-expression
         
-        @note Caches parsed results for performance
+        @note Caches parsed results for performance using LRU eviction
         """
         text = text.strip()
         
-        # Check cache
-        # Implement cache size limit (LRU-like behavior)
+        # Check cache (LRU - move to end if found)
+        if text in self.cache:
+            self.cache.move_to_end(text)
+            return self.cache[text]
+        
+        # Evict oldest if cache is full (proper LRU)
         if len(self.cache) >= self.max_cache_size:
-            # Clear cache when limit reached (simple strategy)
-            self.cache.clear()
+            self.cache.popitem(last=False)
         
         stack = [[]]
         i = 0

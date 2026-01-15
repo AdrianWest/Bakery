@@ -58,7 +58,6 @@ COLOR_ERROR_BG = (255, 240, 240)    # Light red
 
 # Font settings
 LOG_FONT_SIZE = 9
-LOG_FONT_FAMILY = None  # Will use wx.FONTFAMILY_TELETYPE
 
 # Library naming
 DEFAULT_LOCAL_LIB_NAME = "MyLib"
@@ -104,8 +103,6 @@ SEXPR_OPTIONS = "options"
 SEXPR_DESCR = "descr"
 SEXPR_PROPERTY = "property"
 SEXPR_FOOTPRINT = "Footprint"
-SEXPR_REFERENCE = "Reference"
-SEXPR_VALUE = "Value"
 SEXPR_MODEL = "model"
 SEXPR_FP_LIB_TABLE = "fp_lib_table"
 SEXPR_SYM_LIB_TABLE = "sym_lib_table"
@@ -132,12 +129,9 @@ PROGRESS_STEP_UPDATE_SYM_LIB_TABLE = "Updating Symbol Library Table"
 ERROR_NO_BOARD = "No board loaded. Please open a PCB file first."
 ERROR_PROJECT_NOT_SAVED = "Please save the project before running Bakery."
 ERROR_BACKUP_FAILED = "Failed to create backup file"
-ERROR_FILE_NOT_FOUND = "File not found"
-ERROR_PERMISSION_DENIED = "Permission denied"
 
 # Success messages
 SUCCESS_LOCALIZATION_COMPLETE = "Localization complete!"
-SUCCESS_BACKUP_CREATED = "Backup created"
 
 # Confirmation messages
 CONFIRM_LOCALIZATION = (

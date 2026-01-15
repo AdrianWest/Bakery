@@ -57,7 +57,7 @@ from .sexpr_parser import SExpressionParser
 from .backup_manager import BackupManager
 from .utils import (
     expand_kicad_path, safe_read_file, find_schematic_files,
-    scan_schematics_for_items, update_library_table
+    scan_schematics_for_items
 )
 
 
@@ -480,7 +480,8 @@ class SymbolLocalizer:
             self.log('warning', "No schematic files found")
             return
         
-        # Check if any schematic files are open/locked
+        # Note: File lock check is now done upfront in bakery_plugin.py
+        # This is a redundant safety check
         locked_files = []
         for sch_file in schematic_files:
             if self._is_file_locked(sch_file):
@@ -488,8 +489,7 @@ class SymbolLocalizer:
         
         if locked_files:
             self.log('warning', f"The following schematic file(s) appear to be open: {', '.join(locked_files)}")
-            self.log('warning', "Please close all schematic editors before continuing")
-            self.log('error', "Cannot update schematics while they are open in the editor")
+            self.log('error', "Cannot update schematics - files are locked")
             return
         
         total_updated = 0

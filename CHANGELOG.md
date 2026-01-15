@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KiCad Plugin Manager (PCM) release checklist (PCM_RELEASE_CHECKLIST.md)
 - High-resolution plugin icon (256x256 pixels)
 - File lock detection to prevent schematic modification while files are open in editor
+- Upfront schematic file lock checking before starting localization process
+- Completion dialog showing summary of copied items when process finishes
+- Helper methods in FootprintLocalizer: copy_single_model() and update_footprint_model_paths()
 
 ### Changed
 - Updated all class docstrings to use Doxygen format with `!` marker
@@ -31,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added placeholders for download hash and file sizes
 - Plugin icon changed from Bakery_Icon.png to Bakery_Icon_256x256.png for better quality
 - Updated install.bat to copy new 256x256 icon
+- Improved S-expression parser cache to use proper LRU eviction with OrderedDict
+- Refactored nested try-except blocks in 3D model localization for better maintainability
+- Progress bar now resets to 0 after completion
+
+### Removed
+- Unused functions from utils.py: safe_write_file(), update_library_table()
+- Unused constants: LOG_FONT_FAMILY, SEXPR_REFERENCE, SEXPR_VALUE
+- Unused error messages: ERROR_FILE_NOT_FOUND, ERROR_PERMISSION_DENIED, SUCCESS_BACKUP_CREATED
+- Dead code cleanup (~75 lines removed)
 
 ### Fixed
 - Missing constant imports in library_manager.py:
@@ -45,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS
   - ENV_VAR_KIPRJMOD
 - README now accurately reflects current implementation (symbols fully implemented)
+- Syntax errors in constants.py and utils.py introduced during code cleanup
 
 ## [1.0.0] - 2026-01-11
 

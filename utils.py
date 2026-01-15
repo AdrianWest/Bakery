@@ -143,25 +143,6 @@ def safe_read_file(path: str, encoding: str = 'utf-8', max_size: Optional[int] =
         return f.read()
 
 
-def safe_write_file(path: str, content: str, encoding: str = 'utf-8', project_dir: Optional[str] = None) -> None:
-    """
-    @brief Safely write to a file with path validation
-    
-    @param path: Path to write to
-    @param content: Content to write
-    @param encoding: File encoding (default: utf-8)
-    @param project_dir: Optional project directory for safety validation
-    
-    @throws ValueError if path is unsafe
-    @throws OSError if file cannot be written
-    """
-    if project_dir and not validate_path_safety(path, project_dir):
-        raise ValueError(f"Unsafe path (outside project directory): {path}")
-    
-    with open(path, 'w', encoding=encoding) as f:
-        f.write(content)
-
-
 def find_schematic_files(project_dir: str) -> list:
     """
     @brief Find all schematic files in project directory
@@ -237,46 +218,3 @@ def parse_file_with_sexpr(file_path: str, parser):
     content = safe_read_file(file_path)
     return parser.parse(content)
 
-
-def update_library_table(
-    table_path: str,
-    lib_name: str,
-    table_type: str,
-    parser,
-    logger=None
-):
-    """
-    @brief Generic library table update function
-    
-    @param table_path: Path to library table file
-    @param lib_name: Library name to check/add
-    @param table_type: Type identifier for table (e.g., 'fp_lib_table', 'sym_lib_table')
-    @param parser: SExpressionParser instance
-    @param logger: Optional logger object
-    @return Tuple of (sexpr, is_new_table, lib_exists)
-    
-    Reads existing table or creates new one. Returns parsed structure
-    and flags indicating whether table is new and if library already exists.
-    """
-    from .constants import SEXPR_NAME
-    
-    def log(level, msg):
-        if logger:
-            method = getattr(logger, level, None)
-            if method:
-                method(msg)
-    
-    if os.path.exists(table_path):
-        log('info', f"Found existing {table_type}")
-        content = safe_read_file(table_path)
-        
-        # Check if library already exists
-        if f'({SEXPR_NAME} "{lib_name}")' in content or f"({SEXPR_NAME} '{lib_name}')" in content:
-            log('info', f"Library '{lib_name}' already exists in {table_type}")
-            return None, False, True
-        
-        sexpr = parser.parse(content)
-        return sexpr, False, False
-    else:
-        log('info', f"Creating new {table_type}")
-        return None, True, False

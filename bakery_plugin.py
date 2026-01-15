@@ -205,6 +205,32 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                         f"Models={self.config[CONFIG_MODELS_DIR_NAME]}, "
                         f"Backups={self.config[CONFIG_CREATE_BACKUPS]}")
         
+        # Check if schematic files are locked before starting
+        self.logger.info("Checking for open schematic files...")
+        import glob
+        from .constants import EXTENSION_SCHEMATIC
+        schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
+        if schematic_files:
+            locked_files = []
+            for sch_file in schematic_files:
+                try:
+                    with open(sch_file, 'r+', encoding='utf-8') as f:
+                        pass
+                except (IOError, PermissionError):
+                    locked_files.append(os.path.basename(sch_file))
+            
+            if locked_files:
+                self.logger.warning(f"The following schematic file(s) are currently open: {', '.join(locked_files)}")
+                self.logger.error("Please close all schematic editors before running this plugin")
+                wx.MessageBox(
+                    f"Cannot proceed - schematic files are open:\n\n" +
+                    "\n".join(locked_files) +
+                    "\n\nPlease close the schematic editor and try again.",
+                    "Schematic Files Locked",
+                    wx.OK | wx.ICON_WARNING
+                )
+                return
+        
         # Create localizers
         fp_localizer = FootprintLocalizer(self.logger)
         sym_localizer = SymbolLocalizer(self.logger)
@@ -328,5 +354,19 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             self.logger.info(f"Backups created: {len(all_backups)} file(s)")
             for backup in all_backups:
                 self.logger.info(f"  - {os.path.basename(backup)}")
+        
+        # Reset progress bar and show completion dialog
+        self.logger.set_progress(0, 100, "")
+        
+        # Show completion dialog
+        wx.MessageBox(
+            f"Localization Complete!\n\n"
+            f"• {len(copied_footprints)} footprints copied\n"
+            f"• {len(copied_symbols)} symbols copied\n"
+            f"• {len(all_backups)} backup(s) created\n\n"
+            f"All references have been updated to use local libraries.",
+            "Bakery - Success",
+            wx.OK | wx.ICON_INFORMATION
+        )
 
 

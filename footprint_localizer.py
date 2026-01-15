@@ -340,6 +340,163 @@ class FootprintLocalizer:
             self.log('info', f"  • {len(footprints_to_update)} footprints updated with local paths")
             if failed_count > 0:
                 self.log('warning', f"  • {failed_count} models could not be copied")
+        
+        return (copied_count, failed_count)
+    
+    def copy_single_model(self, model_path: str, expanded_path: str, models_dir: str, 
+                         models_dir_name: str, copied_models: dict) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        @brief Copy a single 3D model file to local project folder
+        
+        @param model_path: Original model path from footprint
+        @param expanded_path: Expanded absolute path to model file
+        @param models_dir: Destination models directory path
+        @param models_dir_name: Name of models directory
+        @param copied_models: Dictionary tracking already copied models
+        @return Tuple of (success, old_path, new_path)
+        """
+        model_filename = os.path.basename(expanded_path)
+        
+        if not os.path.exists(expanded_path):
+            self.log('warning', f"      ✗ Model file not found: {expanded_path}")
+            return False, None, None
+        
+        # Check if already copied
+        if model_path in copied_models:
+            self.log('info', f"      ✓ Already copied: {model_filename}")
+            return True, model_path, copied_models[model_path]
+        
+        # Copy the model file
+        dest_model_path = os.path.join(models_dir, model_filename)
+        
+        try:
+            shutil.copy2(expanded_path, dest_model_path)
+            self.log('info', f"      ✓ Copied to {dest_model_path}")
+            
+            # Store relative path
+            relative_model_path = f"${{{ENV_VAR_KIPRJMOD}}}/{models_dir_name}/{model_filename}"
+            copied_models[model_path] = relative_model_path
+            return True, model_path, relative_model_path
+            
+        except Exception as e:
+            self.log('error', f"      ✗ Failed to copy {model_filename}: {str(e)}")
+            return False, None, None
+    
+    def update_footprint_model_paths(self, footprint_path: str, old_paths: List[str], 
+                                    new_paths: List[str]) -> bool:
+        """
+        @brief Update 3D model paths in a footprint file
+        
+        @param footprint_path: Path to footprint file
+        @param old_paths: List of old model paths to replace
+        @param new_paths: List of new local model paths
+        @return True if successful, False otherwise
+        """
+        try:
+            with open(footprint_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Replace old model paths with new local paths
+            for old_path, new_path in zip(old_paths, new_paths):
+                content = content.replace(f'"{old_path}"', f'"{new_path}"')
+            
+            with open(footprint_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            self.log('info', f"  ✓ Updated {os.path.basename(footprint_path)}")
+            return True
+            
+        except Exception as e:
+            self.log('error', f"  ✗ Failed to update {os.path.basename(footprint_path)}: {str(e)}")
+            return False
+    
+    def localize_3d_models(self, copied_footprints: List[Tuple[str, str, str, str]], 
+                          project_dir: str, models_dir_name: str) -> Tuple[int, int]:
+        """
+        @brief Localize 3D models from copied footprints
+        
+        @param copied_footprints: List of (lib_name, fp_name, source_path, dest_path) tuples
+        @param project_dir: Project directory path
+        @param models_dir_name: Name of 3D models directory
+        @return Tuple of (copied_count, failed_count)
+        """
+        if not copied_footprints:
+            self.log('info', "No footprints were copied, skipping 3D model localization")
+            return (0, 0)
+        
+        self.log('info', PROGRESS_STEP_COPY_3D_MODELS + "...")
+        
+        # Create 3D Models folder
+        models_dir = os.path.join(project_dir, models_dir_name)
+        os.makedirs(models_dir, exist_ok=True)
+        self.log('info', f"Using 3D models folder: {models_dir}")
+        
+        copied_models = {}
+        footprints_to_update = []
+        total_models = 0
+        copied_count = 0
+        failed_count = 0
+        
+        # Process each copied footprint
+        for lib_name, fp_name, source_fp_path, dest_fp_path in copied_footprints:
+            self.log('info', f"Checking {fp_name} for 3D models...")
+            
+            # Extract 3D model references
+            try:
+                with open(source_fp_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                sexpr = self.parser.parse(content)
+                model_paths = self.parser.find_3d_models(sexpr)
+            except Exception as e:
+                self.log('warning', f"Could not parse footprint for 3D models: {e}")
+                continue
+            
+            if not model_paths:
+                self.log('info', f"  No 3D models found in {fp_name}")
+                continue
+            
+            self.log('info', f"  Found {len(model_paths)} 3D model(s)")
+            total_models += len(model_paths)
+            
+            old_model_paths = []
+            new_model_paths = []
+            
+            for model_path in model_paths:
+                self.log('info', f"    Model: {model_path}")
+                
+                # Expand environment variables
+                expanded_path = self.lib_manager.expand_path(model_path)
+                
+                # Copy the model
+                success, old_path, new_path = self.copy_single_model(
+                    model_path, expanded_path, models_dir, models_dir_name, copied_models
+                )
+                
+                if success and old_path and new_path:
+                    old_model_paths.append(old_path)
+                    new_model_paths.append(new_path)
+                    copied_count += 1
+                else:
+                    failed_count += 1
+            
+            # Queue footprint for updating
+            if old_model_paths:
+                footprints_to_update.append((dest_fp_path, old_model_paths, new_model_paths))
+        
+        # Update footprint files
+        if footprints_to_update:
+            self.log('info', f"Updating {len(footprints_to_update)} footprint(s) to reference local 3D models...")
+            
+            for dest_fp_path, old_paths, new_paths in footprints_to_update:
+                self.update_footprint_model_paths(dest_fp_path, old_paths, new_paths)
+        
+        # Summary
+        if total_models > 0:
+            self.log('success', f"3D model localization complete:")
+            self.log('info', f"  • {copied_count} unique models copied to {models_dir_name} folder")
+            self.log('info', f"  • {len(footprints_to_update)} footprints updated with local paths")
+            if failed_count > 0:
+                self.log('warning', f"  • {failed_count} models could not be copied")
         else:
             self.log('info', "No 3D models found in footprints")
         

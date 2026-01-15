@@ -437,6 +437,21 @@ class SymbolLocalizer:
             self.log('error', f"Failed to write symbol library: {e}")
             raise
     
+    def _is_file_locked(self, filepath: str) -> bool:
+        """
+        @brief Check if a file is locked/open by another process
+        
+        @param filepath: Path to file to check
+        @return True if file is locked, False otherwise
+        """
+        try:
+            # Try to open file in exclusive mode
+            with open(filepath, 'r+', encoding='utf-8') as f:
+                pass
+            return False
+        except (IOError, PermissionError):
+            return True
+    
     def update_schematic_references(self, copied_symbols: List[Tuple[str, str, list]], 
                                    project_dir: str, local_lib_name: str, create_backups: bool):
         """
@@ -463,6 +478,18 @@ class SymbolLocalizer:
         
         if not schematic_files:
             self.log('warning', "No schematic files found")
+            return
+        
+        # Check if any schematic files are open/locked
+        locked_files = []
+        for sch_file in schematic_files:
+            if self._is_file_locked(sch_file):
+                locked_files.append(os.path.basename(sch_file))
+        
+        if locked_files:
+            self.log('warning', f"The following schematic file(s) appear to be open: {', '.join(locked_files)}")
+            self.log('warning', "Please close all schematic editors before continuing")
+            self.log('error', "Cannot update schematics while they are open in the editor")
             return
         
         total_updated = 0

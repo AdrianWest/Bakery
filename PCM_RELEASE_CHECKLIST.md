@@ -17,7 +17,7 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   - Update CHANGELOG.md with release date
   - Update README.md status (change "In Development" to "Released")
 
-- [ ] **Verify documentation is complete**
+- [O] **Verify documentation is complete**
   - README.md is accurate and comprehensive
   - CHANGELOG.md includes all changes
   - All Python files have proper Doxygen docstrings

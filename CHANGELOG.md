@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Utility module (utils.py) for shared functionality
 - KiCad Plugin Manager (PCM) release checklist (PCM_RELEASE_CHECKLIST.md)
 - High-resolution plugin icon (256x256 pixels)
+- File lock detection to prevent schematic modification while files are open in editor
 
 ### Changed
 - Updated all class docstrings to use Doxygen format with `!` marker

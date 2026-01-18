@@ -415,23 +415,54 @@ class SymbolLocalizer:
         try:
             # Start with library header or read existing file
             if os.path.exists(lib_path):
+                self.log('info', f"Reading existing library file: {lib_path}")
                 with open(lib_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                lib_sexpr = self.parser.parse(content)
+                
+                # Check if file is empty or just has whitespace
+                if not content.strip():
+                    self.log('warning', f"Existing library file is empty, creating new structure")
+                    lib_sexpr = [SEXPR_LIB_SYMBOLS, 
+                               ['version', '20241209'], 
+                               ['generator', 'kicad_symbol_editor'], 
+                               ['generator_version', '9.0']]
+                else:
+                    lib_sexpr = self.parser.parse(content)
+                    # Validate that it's a proper symbol library
+                    if not (isinstance(lib_sexpr, list) and len(lib_sexpr) > 0 and lib_sexpr[0] == SEXPR_LIB_SYMBOLS):
+                        self.log('warning', f"Existing file is not a valid symbol library, creating new structure")
+                        lib_sexpr = [SEXPR_LIB_SYMBOLS, 
+                                   ['version', '20241209'], 
+                                   ['generator', 'kicad_symbol_editor'], 
+                                   ['generator_version', '9.0']]
+                    else:
+                        self.log('info', f"Existing library has {len(lib_sexpr) - 4} symbols")
             else:
-                # Create new library structure
-                lib_sexpr = [SEXPR_LIB_SYMBOLS, ['version', '20211014'], ['generator', 'kicad_symbol_editor'], ['generator_version', '9.0']]
+                self.log('info', f"Creating new library file: {lib_path}")
+                # Create new library structure (matching KiCad format)
+                lib_sexpr = [SEXPR_LIB_SYMBOLS, 
+                           ['version', '20241209'], 
+                           ['generator', 'kicad_symbol_editor'], 
+                           ['generator_version', '9.0']]
             
             # Add new symbols
+            symbols_added = 0
             for symbol_data in symbol_contents:
                 lib_sexpr.append(symbol_data)
+                symbols_added += 1
+            
+            self.log('info', f"Writing {symbols_added} new symbols to library")
             
             # Convert to string
             lib_content = self.parser.to_string(lib_sexpr)
             
+            self.log('info', f"Library content size: {len(lib_content)} characters")
+            
             # Write to file
             with open(lib_path, 'w', encoding='utf-8') as f:
                 f.write(lib_content)
+            
+            self.log('info', f"Successfully wrote symbol library to {lib_path}")
                 
         except Exception as e:
             self.log('error', f"Failed to write symbol library: {e}")

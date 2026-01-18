@@ -114,7 +114,7 @@ Bakery/
 
 ## Requirements
 
-- KiCad 9.0 or later
+- KiCad 8.0 or later
 - Python 3.x (bundled with KiCad)
 - wxPython (bundled with KiCad)
 
@@ -135,6 +135,8 @@ GNU General Public License v3.0 - see LICENSE file
 
 Contributions welcome! Please open an issue or pull request.
 
+Please note that this project is released with a [Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
+
 ## Roadmap
 
 ### Version 1.0 (In Development - Unreleased)
@@ -149,7 +151,7 @@ Contributions welcome! Please open an issue or pull request.
 - [x] Automatic timestamped backup creation
 - [x] KiCad 8 & 9 environment variable compatibility
 - [x] Comprehensive Doxygen documentation
-- [x] Support for hierarchical schematics
+- [x] Support for hierarchical schematics (tested)
 - [ ] Full testing and bug fixes
 
 ### Planned for Future Versions

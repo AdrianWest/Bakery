@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Code of Conduct (CODE_OF_CONDUCT.md) referenced in README Contributing section
+
+### Changed
+- README requirements updated to correctly state "KiCad 8.0 or later" (was incorrectly "9.0 or later")
+- Symbol library version format updated to 20241209 (was 20211014)
+
+### Fixed
+- Symbol library file handling when file doesn't exist or is empty
+  - Added validation to detect empty or corrupted symbol library files
+  - Properly creates new library structure if existing file is invalid
+  - Enhanced logging in write_symbol_library() to track symbol writing progress
+  - Now handles edge cases where library file exists but contains only whitespace
+
+### Added (Previous)
 - Symbol localization from global to project libraries
 - Symbol library table (sym-lib-table) management
 - Comprehensive Doxygen-style documentation for all modules and classes
@@ -20,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upfront schematic file lock checking before starting localization process
 - Completion dialog showing summary of copied items when process finishes
 - Helper methods in FootprintLocalizer: copy_single_model() and update_footprint_model_paths()
-- **Support for hierarchical schematics** - Recursively finds all .kicad_sch files in subdirectories
+- **Support for hierarchical schematics (tested)** - Recursively finds all .kicad_sch files in subdirectories
 
 ### Changed
 - Updated all class docstrings to use Doxygen format with `!` marker
@@ -95,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Planned for Future Versions]
 
-- Support for hierarchical schematics
+- Additional features based on user feedback
 
 ---
 

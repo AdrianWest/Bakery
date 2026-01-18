@@ -57,7 +57,7 @@ from .constants import (
     CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_CREATE_BACKUPS,
     DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_DIR_NAME,
     DEFAULT_MODELS_DIR_NAME, LOGGER_WINDOW_SIZE, LOG_FONT_SIZE,
-    COLOR_WARNING_BG, COLOR_ERROR_BG
+    COLOR_WARNING_BG, COLOR_ERROR_BG, PROGRESS_BAR_RANGE
 )
 from .utils import validate_library_name
 
@@ -275,7 +275,7 @@ class BakeryLogger(wx.Dialog):
         self.progress_label = wx.StaticText(self, label="Initializing...")
         main_sizer.Add(self.progress_label, 0, wx.ALL, 5)
         
-        self.progress_bar = wx.Gauge(self, range=100, style=wx.GA_HORIZONTAL)
+        self.progress_bar = wx.Gauge(self, range=PROGRESS_BAR_RANGE, style=wx.GA_HORIZONTAL)
         main_sizer.Add(self.progress_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
         # Create main log section
@@ -343,7 +343,7 @@ class BakeryLogger(wx.Dialog):
         self.SetSizer(main_sizer)
         self.Centre()
     
-    def set_progress(self, value: int, maximum: int = 100, message: str = ""):
+    def set_progress(self, value: int, maximum: int = PROGRESS_BAR_RANGE, message: str = ""):
         """
         @brief Update the progress bar
         

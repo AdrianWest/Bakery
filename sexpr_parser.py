@@ -43,11 +43,11 @@ from typing import List, Union, Any, Optional
 from collections import OrderedDict
 from .constants import (
     SEXPR_FP_LIB_TABLE, SEXPR_LIB, SEXPR_LIB_SYMBOLS, SEXPR_SYMBOL,
-    SEXPR_PROPERTY, SEXPR_FOOTPRINT, SEXPR_MODEL, SEXPR_NAME, SEXPR_URI
+    SEXPR_PROPERTY, SEXPR_FOOTPRINT, SEXPR_MODEL, SEXPR_NAME, SEXPR_URI,
+    MAX_CACHE_SIZE
 )
 
-# Maximum cache size to prevent unbounded memory growth
-MAX_CACHE_SIZE = 100
+# Maximum cache size to prevent unbounded memory growth (defined in constants)
 
 
 class SExpressionParser:

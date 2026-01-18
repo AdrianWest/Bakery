@@ -39,10 +39,11 @@ schematic file discovery, and library table management functions.
 import os
 import re
 from typing import Optional
+from .constants import MAX_FILE_SIZE_BYTES
 
 
 # Maximum file size to read into memory (50MB)
-MAX_FILE_SIZE = 50 * 1024 * 1024
+MAX_FILE_SIZE = MAX_FILE_SIZE_BYTES
 
 
 def validate_library_name(name: str) -> bool:

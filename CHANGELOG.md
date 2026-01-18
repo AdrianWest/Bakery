@@ -8,8 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Comprehensive unit test suite** with 151 tests covering all Python modules
-  - test_constants.py - Plugin metadata and configuration validation (27 tests)
+- **Named constants for all magic numbers** to improve code maintainability
+  - PROGRESS_BAR_RANGE, PROGRESS_INITIAL, PROGRESS_COMPLETE - Progress bar settings
+  - PROGRESS_PCT_* constants for all 11 progress step percentages
+  - MAX_FILE_SIZE_BYTES, BYTES_PER_KB, BYTES_PER_MB - File size limits
+  - MAX_CACHE_SIZE - S-expression parser LRU cache size
+  - KICAD_SYMBOL_VERSION, KICAD_GENERATOR_NAME, KICAD_GENERATOR_VERSION - KiCad file format version metadata
+  - LIB_SYMBOLS_METADATA_COUNT - Symbol library structure offset
+  - All hardcoded numeric values replaced with descriptive constants
+  - Enhanced test suite with 7 new test methods (158 total tests, +7 from 151)
+- **Comprehensive unit test suite** with 158 tests covering all Python modules
+  - test_constants.py - Plugin metadata and configuration validation (30 tests, +7)
   - test_utils.py - Path validation and file operations (34 tests)
   - test_sexpr_parser.py - S-expression parsing and serialization (17 tests)
   - test_backup_manager.py - File backup creation and tracking (16 tests)
@@ -28,33 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Common logging, file lock detection, and schematic update methods
   - Template methods for consistent behavior across all localizers
   - 198 lines of reusable code
-
-### Changed
-- README requirements updated to correctly state "KiCad 8.0 or later" (was incorrectly "9.0 or later")
-- Symbol library version format updated to 20241209 (was 20211014)
-- **Major refactoring to eliminate code duplication (Code Review Issue #8)**
-  - Created BaseLocalizer abstract base class with shared functionality
-  - FootprintLocalizer now inherits from BaseLocalizer
-  - SymbolLocalizer now inherits from BaseLocalizer
-  - Eliminated duplicate methods:
-    - log() method removed from both child classes
-    - is_file_locked() consolidated in base class
-    - find_schematic_files() moved to base class
-    - update_schematic_file() centralized with generic implementation
-    - replace_references_in_content() shared method for text replacements
-  - Simplified update_schematic_references() in both localizers (~100 lines reduced to ~40)
-  - Reduced total code duplication by ~150 lines
-  - Improved maintainability, consistency, and extensibility
-  - Maintains full backward compatibility with existing code
-
-### Fixed
-- Symbol library file handling when file doesn't exist or is empty
-  - Added validation to detect empty or corrupted symbol library files
-  - Properly creates new library structure if existing file is invalid
-  - Enhanced logging in write_symbol_library() to track symbol writing progress
-  - Now handles edge cases where library file exists but contains only whitespace
-
-### Added (Previous)
 - Symbol localization from global to project libraries
 - Symbol library table (sym-lib-table) management
 - Comprehensive Doxygen-style documentation for all modules and classes
@@ -70,6 +52,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Support for hierarchical schematics (tested)** - Recursively finds all .kicad_sch files in subdirectories
 
 ### Changed
+- README requirements updated to correctly state "KiCad 8.0 or later" (was incorrectly "9.0 or later")
+- Symbol library version format updated to 20241209 (was 20211014)
+- **Refactored long methods in FootprintLocalizer for better maintainability**
+  - Extracted `copy_footprints` method (70 → 40 lines):
+    - `filter_footprints_to_copy` - Separates filtering logic
+    - `find_and_copy_footprint` - Handles single footprint copy
+  - Extracted `localize_3d_models` method (95 → 54 lines):
+    - `extract_3d_models` - Parses footprint for 3D model paths
+    - `process_footprint_models` - Processes all models for one footprint
+    - `update_footprints_with_local_models` - Updates multiple footprint files
+  - Improved code organization with focused, single-purpose methods
+  - Enhanced testability and readability
+  - All helper methods are public (no private underscore prefix)
+- **Major refactoring to eliminate code duplication (Code Review Issue #8)**
+  - Created BaseLocalizer abstract base class with shared functionality
+  - FootprintLocalizer now inherits from BaseLocalizer
+  - SymbolLocalizer now inherits from BaseLocalizer
+  - Eliminated duplicate methods:
+    - log() method removed from both child classes
+    - is_file_locked() consolidated in base class
+    - find_schematic_files() moved to base class
+    - update_schematic_file() centralized with generic implementation
+    - replace_references_in_content() shared method for text replacements
+  - Simplified update_schematic_references() in both localizers (~100 lines reduced to ~40)
+  - Reduced total code duplication by ~150 lines
+  - Improved maintainability, consistency, and extensibility
+  - Maintains full backward compatibility with existing code
 - Updated all class docstrings to use Doxygen format with `!` marker
 - Enhanced documentation with detailed descriptions and notes sections
 - Improved project structure documentation in README
@@ -86,13 +95,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored nested try-except blocks in 3D model localization for better maintainability
 - Progress bar now resets to 0 after completion
 
-### Removed
-- Unused functions from utils.py: safe_write_file(), update_library_table()
-- Unused constants: LOG_FONT_FAMILY, SEXPR_REFERENCE, SEXPR_VALUE
-- Unused error messages: ERROR_FILE_NOT_FOUND, ERROR_PERMISSION_DENIED, SUCCESS_BACKUP_CREATED
-- Dead code cleanup (~75 lines removed)
-
 ### Fixed
+- Symbol library file handling when file doesn't exist or is empty
+  - Added validation to detect empty or corrupted symbol library files
+  - Properly creates new library structure if existing file is invalid
+  - Enhanced logging in write_symbol_library() to track symbol writing progress
+  - Now handles edge cases where library file exists but contains only whitespace
 - Missing constant imports in library_manager.py:
   - KICAD_ENV_FOOTPRINT_DIR, KICAD_ENV_3DMODEL_DIR, KICAD_ENV_SYMBOL_DIR
   - KICAD_VERSION_FALLBACK
@@ -106,6 +114,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ENV_VAR_KIPRJMOD
 - README now accurately reflects current implementation (symbols fully implemented)
 - Syntax errors in constants.py and utils.py introduced during code cleanup
+
+### Removed
+- Unused functions from utils.py: safe_write_file(), update_library_table()
+- Unused constants: LOG_FONT_FAMILY, SEXPR_REFERENCE, SEXPR_VALUE
+- Unused error messages: ERROR_FILE_NOT_FOUND, ERROR_PERMISSION_DENIED, SUCCESS_BACKUP_CREATED
+- Dead code cleanup (~75 lines removed)
 
 ## [1.0.0] - 2026-01-11
 

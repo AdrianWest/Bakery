@@ -51,7 +51,9 @@ from .constants import (
     LIBRARY_TYPE_KICAD, PROGRESS_STEP_SCAN_SYMBOLS, PROGRESS_STEP_COPY_SYMBOLS,
     PROGRESS_STEP_UPDATE_SYM_LIB_TABLE, ENV_VAR_KIPRJMOD,
     KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK,
-    ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC
+    ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC,
+    KICAD_SYMBOL_VERSION, KICAD_GENERATOR_NAME, KICAD_GENERATOR_VERSION,
+    LIB_SYMBOLS_METADATA_COUNT
 )
 from .base_localizer import BaseLocalizer
 from .utils import (
@@ -409,27 +411,27 @@ class SymbolLocalizer(BaseLocalizer):
                 if not content.strip():
                     self.log('warning', f"Existing library file is empty, creating new structure")
                     lib_sexpr = [SEXPR_LIB_SYMBOLS, 
-                               ['version', '20241209'], 
-                               ['generator', 'kicad_symbol_editor'], 
-                               ['generator_version', '9.0']]
+                               ['version', KICAD_SYMBOL_VERSION], 
+                               ['generator', KICAD_GENERATOR_NAME], 
+                               ['generator_version', KICAD_GENERATOR_VERSION]]
                 else:
                     lib_sexpr = self.parser.parse(content)
                     # Validate that it's a proper symbol library
                     if not (isinstance(lib_sexpr, list) and len(lib_sexpr) > 0 and lib_sexpr[0] == SEXPR_LIB_SYMBOLS):
                         self.log('warning', f"Existing file is not a valid symbol library, creating new structure")
                         lib_sexpr = [SEXPR_LIB_SYMBOLS, 
-                                   ['version', '20241209'], 
-                                   ['generator', 'kicad_symbol_editor'], 
-                                   ['generator_version', '9.0']]
+                                   ['version', KICAD_SYMBOL_VERSION], 
+                                   ['generator', KICAD_GENERATOR_NAME], 
+                                   ['generator_version', KICAD_GENERATOR_VERSION]]
                     else:
-                        self.log('info', f"Existing library has {len(lib_sexpr) - 4} symbols")
+                        self.log('info', f"Existing library has {len(lib_sexpr) - LIB_SYMBOLS_METADATA_COUNT} symbols")
             else:
                 self.log('info', f"Creating new library file: {lib_path}")
                 # Create new library structure (matching KiCad format)
                 lib_sexpr = [SEXPR_LIB_SYMBOLS, 
-                           ['version', '20241209'], 
-                           ['generator', 'kicad_symbol_editor'], 
-                           ['generator_version', '9.0']]
+                           ['version', KICAD_SYMBOL_VERSION], 
+                           ['generator', KICAD_GENERATOR_NAME], 
+                           ['generator_version', KICAD_GENERATOR_VERSION]]
             
             # Add new symbols
             symbols_added = 0

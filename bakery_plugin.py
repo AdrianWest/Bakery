@@ -51,7 +51,11 @@ from .constants import (
     PROGRESS_STEP_COPY_FOOTPRINTS, PROGRESS_STEP_COPY_SYMBOLS, PROGRESS_STEP_COPY_3D_MODELS,
     PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS,
     PROGRESS_STEP_UPDATE_LIB_TABLE, PROGRESS_STEP_UPDATE_SYM_LIB_TABLE,
-    SUCCESS_LOCALIZATION_COMPLETE
+    SUCCESS_LOCALIZATION_COMPLETE, PROGRESS_INITIAL, PROGRESS_BAR_RANGE,
+    PROGRESS_PCT_SCAN_PCB, PROGRESS_PCT_SCAN_SCHEMATICS, PROGRESS_PCT_COPY_FOOTPRINTS,
+    PROGRESS_PCT_COPY_3D_MODELS, PROGRESS_PCT_UPDATE_LIB_TABLE, PROGRESS_PCT_UPDATE_PCB,
+    PROGRESS_PCT_UPDATE_SCHEMATICS, PROGRESS_PCT_SCAN_SYMBOLS, PROGRESS_PCT_COPY_SYMBOLS,
+    PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, PROGRESS_PCT_UPDATE_SYMBOL_REFS, PROGRESS_COMPLETE
 )
 from .ui_components import BakeryLogger, ConfigDialog
 from .footprint_localizer import FootprintLocalizer
@@ -239,10 +243,10 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         # === FOOTPRINT LOCALIZATION ===
         
         # Step 1: Scan for footprints
-        self.logger.set_progress(5, 100, PROGRESS_STEP_SCAN_PCB)
+        self.logger.set_progress(PROGRESS_PCT_SCAN_PCB, PROGRESS_BAR_RANGE, PROGRESS_STEP_SCAN_PCB)
         pcb_footprints = fp_localizer.scan_pcb_footprints(board)
         
-        self.logger.set_progress(10, 100, PROGRESS_STEP_SCAN_SCHEMATICS)
+        self.logger.set_progress(PROGRESS_PCT_SCAN_SCHEMATICS, PROGRESS_BAR_RANGE, PROGRESS_STEP_SCAN_SCHEMATICS)
         sch_footprints = fp_localizer.scan_schematic_footprints(project_dir)
         
         # Combine footprints from both sources
@@ -250,7 +254,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.logger.info(f"Total unique footprints found: {len(all_footprints)}")
         
         # Step 2: Copy footprints
-        self.logger.set_progress(20, 100, PROGRESS_STEP_COPY_FOOTPRINTS)
+        self.logger.set_progress(PROGRESS_PCT_COPY_FOOTPRINTS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_FOOTPRINTS)
         copied_footprints = []
         if all_footprints:
             copied_footprints = fp_localizer.copy_footprints(
@@ -261,7 +265,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         
         # Step 3: Localize 3D models
         if copied_footprints:
-            self.logger.set_progress(30, 100, PROGRESS_STEP_COPY_3D_MODELS)
+            self.logger.set_progress(PROGRESS_PCT_COPY_3D_MODELS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_3D_MODELS)
             fp_localizer.localize_3d_models(
                 copied_footprints,
                 project_dir,
@@ -269,11 +273,11 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             )
             
             # Step 4: Update footprint library table
-            self.logger.set_progress(40, 100, PROGRESS_STEP_UPDATE_LIB_TABLE)
+            self.logger.set_progress(PROGRESS_PCT_UPDATE_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_LIB_TABLE)
             lib_manager.update_fp_lib_table(project_dir, self.config[CONFIG_LOCAL_LIB_NAME])
             
             # Step 5: Update PCB references
-            self.logger.set_progress(45, 100, PROGRESS_STEP_UPDATE_PCB)
+            self.logger.set_progress(PROGRESS_PCT_UPDATE_PCB, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_PCB)
             fp_localizer.update_pcb_references(
                 board,
                 copied_footprints,
@@ -283,7 +287,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             )
             
             # Step 6: Update schematic footprint references
-            self.logger.set_progress(50, 100, PROGRESS_STEP_UPDATE_SCHEMATICS)
+            self.logger.set_progress(PROGRESS_PCT_UPDATE_SCHEMATICS, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_SCHEMATICS)
             fp_localizer.update_schematic_references(
                 copied_footprints,
                 project_dir,
@@ -296,14 +300,14 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         # === SYMBOL LOCALIZATION ===
         
         # Step 7: Scan for symbols
-        self.logger.set_progress(55, 100, PROGRESS_STEP_SCAN_SYMBOLS)
+        self.logger.set_progress(PROGRESS_PCT_SCAN_SYMBOLS, PROGRESS_BAR_RANGE, PROGRESS_STEP_SCAN_SYMBOLS)
         all_symbols = sym_localizer.scan_schematic_symbols(project_dir)
         self.logger.info(f"Total unique symbols found: {len(all_symbols)}")
         
         # Step 8: Copy symbols
         copied_symbols = []
         if all_symbols:
-            self.logger.set_progress(65, 100, PROGRESS_STEP_COPY_SYMBOLS)
+            self.logger.set_progress(PROGRESS_PCT_COPY_SYMBOLS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_SYMBOLS)
             copied_symbols = sym_localizer.copy_symbols(
                 all_symbols,
                 project_dir,
@@ -313,7 +317,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             
             if copied_symbols:
                 # Step 9: Update symbol library table
-                self.logger.set_progress(80, 100, PROGRESS_STEP_UPDATE_SYM_LIB_TABLE)
+                self.logger.set_progress(PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_SYM_LIB_TABLE)
                 sym_localizer.update_sym_lib_table(
                     project_dir,
                     self.config[CONFIG_SYMBOL_LIB_NAME],
@@ -321,7 +325,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                 )
                 
                 # Step 10: Update schematic symbol references
-                self.logger.set_progress(90, 100, "Updating Symbol References")
+                self.logger.set_progress(PROGRESS_PCT_UPDATE_SYMBOL_REFS, PROGRESS_BAR_RANGE, "Updating Symbol References")
                 sym_localizer.update_schematic_references(
                     copied_symbols,
                     project_dir,
@@ -334,7 +338,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             self.logger.info("No symbols found in schematics")
         
         # Complete
-        self.logger.set_progress(100, 100, "Complete")
+        self.logger.set_progress(PROGRESS_COMPLETE, PROGRESS_BAR_RANGE, "Complete")
         self.logger.success(SUCCESS_LOCALIZATION_COMPLETE)
         
         if copied_footprints or copied_symbols:
@@ -356,7 +360,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                 self.logger.info(f"  - {os.path.basename(backup)}")
         
         # Reset progress bar and show completion dialog
-        self.logger.set_progress(0, 100, "")
+        self.logger.set_progress(PROGRESS_INITIAL, PROGRESS_BAR_RANGE, "")
         
         # Show completion dialog
         wx.MessageBox(

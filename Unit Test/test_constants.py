@@ -149,6 +149,83 @@ class TestConstants(unittest.TestCase):
         for key in config_keys:
             self.assertIsInstance(key, str)
             self.assertGreater(len(key), 0)
+    
+    def test_progress_bar_constants(self):
+        """Test progress bar range constants"""
+        self.assertIsInstance(constants.PROGRESS_BAR_RANGE, int)
+        self.assertEqual(constants.PROGRESS_BAR_RANGE, 100)
+        self.assertIsInstance(constants.PROGRESS_INITIAL, int)
+        self.assertEqual(constants.PROGRESS_INITIAL, 0)
+        self.assertIsInstance(constants.PROGRESS_COMPLETE, int)
+        self.assertEqual(constants.PROGRESS_COMPLETE, 100)
+    
+    def test_progress_percentages_valid_range(self):
+        """Test that progress percentages are in valid range (0-100)"""
+        progress_constants = [
+            constants.PROGRESS_PCT_SCAN_PCB,
+            constants.PROGRESS_PCT_SCAN_SCHEMATICS,
+            constants.PROGRESS_PCT_COPY_FOOTPRINTS,
+            constants.PROGRESS_PCT_COPY_3D_MODELS,
+            constants.PROGRESS_PCT_UPDATE_LIB_TABLE,
+            constants.PROGRESS_PCT_UPDATE_PCB,
+            constants.PROGRESS_PCT_UPDATE_SCHEMATICS,
+            constants.PROGRESS_PCT_SCAN_SYMBOLS,
+            constants.PROGRESS_PCT_COPY_SYMBOLS,
+            constants.PROGRESS_PCT_UPDATE_SYM_LIB_TABLE,
+            constants.PROGRESS_PCT_UPDATE_SYMBOL_REFS
+        ]
+        for pct in progress_constants:
+            self.assertIsInstance(pct, int)
+            self.assertGreaterEqual(pct, 0)
+            self.assertLessEqual(pct, 100)
+    
+    def test_progress_percentages_ascending(self):
+        """Test that progress percentages are in ascending order"""
+        self.assertLess(constants.PROGRESS_PCT_SCAN_PCB, constants.PROGRESS_PCT_SCAN_SCHEMATICS)
+        self.assertLess(constants.PROGRESS_PCT_SCAN_SCHEMATICS, constants.PROGRESS_PCT_COPY_FOOTPRINTS)
+        self.assertLess(constants.PROGRESS_PCT_COPY_FOOTPRINTS, constants.PROGRESS_PCT_COPY_3D_MODELS)
+        self.assertLess(constants.PROGRESS_PCT_COPY_3D_MODELS, constants.PROGRESS_PCT_UPDATE_LIB_TABLE)
+        self.assertLess(constants.PROGRESS_PCT_UPDATE_LIB_TABLE, constants.PROGRESS_PCT_UPDATE_PCB)
+        self.assertLess(constants.PROGRESS_PCT_UPDATE_PCB, constants.PROGRESS_PCT_UPDATE_SCHEMATICS)
+        self.assertLess(constants.PROGRESS_PCT_UPDATE_SCHEMATICS, constants.PROGRESS_PCT_SCAN_SYMBOLS)
+        self.assertLess(constants.PROGRESS_PCT_SCAN_SYMBOLS, constants.PROGRESS_PCT_COPY_SYMBOLS)
+        self.assertLess(constants.PROGRESS_PCT_COPY_SYMBOLS, constants.PROGRESS_PCT_UPDATE_SYM_LIB_TABLE)
+        self.assertLess(constants.PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, constants.PROGRESS_PCT_UPDATE_SYMBOL_REFS)
+    
+    def test_file_size_constants(self):
+        """Test file size limit constants"""
+        self.assertIsInstance(constants.MAX_FILE_SIZE_BYTES, int)
+        self.assertEqual(constants.MAX_FILE_SIZE_BYTES, 50 * 1024 * 1024)  # 50MB
+        self.assertIsInstance(constants.BYTES_PER_KB, int)
+        self.assertEqual(constants.BYTES_PER_KB, 1024)
+        self.assertIsInstance(constants.BYTES_PER_MB, int)
+        self.assertEqual(constants.BYTES_PER_MB, 1024 * 1024)
+    
+    def test_cache_size_constant(self):
+        """Test cache size constant"""
+        self.assertIsInstance(constants.MAX_CACHE_SIZE, int)
+        self.assertEqual(constants.MAX_CACHE_SIZE, 100)
+        self.assertGreater(constants.MAX_CACHE_SIZE, 0)
+    
+    def test_kicad_file_format_version_constants(self):
+        """Test KiCad file format version constants"""
+        self.assertIsInstance(constants.KICAD_SYMBOL_VERSION, str)
+        self.assertGreater(len(constants.KICAD_SYMBOL_VERSION), 0)
+        # Version should be in YYYYMMDD format
+        self.assertEqual(len(constants.KICAD_SYMBOL_VERSION), 8)
+        self.assertTrue(constants.KICAD_SYMBOL_VERSION.isdigit())
+        
+        self.assertIsInstance(constants.KICAD_GENERATOR_NAME, str)
+        self.assertGreater(len(constants.KICAD_GENERATOR_NAME), 0)
+        
+        self.assertIsInstance(constants.KICAD_GENERATOR_VERSION, str)
+        self.assertGreater(len(constants.KICAD_GENERATOR_VERSION), 0)
+    
+    def test_lib_symbols_metadata_count(self):
+        """Test library symbols metadata count constant"""
+        self.assertIsInstance(constants.LIB_SYMBOLS_METADATA_COUNT, int)
+        self.assertEqual(constants.LIB_SYMBOLS_METADATA_COUNT, 4)
+        self.assertGreater(constants.LIB_SYMBOLS_METADATA_COUNT, 0)
 
 
 if __name__ == '__main__':

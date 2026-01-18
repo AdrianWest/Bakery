@@ -29,6 +29,7 @@ mkdir "%KICAD_PLUGINS_DIR%"
 REM Copy only essential plugin files
 copy /Y "%~dp0__init__.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0bakery_plugin.py" "%KICAD_PLUGINS_DIR%\"
+copy /Y "%~dp0base_localizer.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0footprint_localizer.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0symbol_localizer.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0library_manager.py" "%KICAD_PLUGINS_DIR%\"

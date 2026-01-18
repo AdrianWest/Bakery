@@ -9,10 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Code of Conduct (CODE_OF_CONDUCT.md) referenced in README Contributing section
+- **New base_localizer.py module** - Base class for all localizers with shared functionality
+  - Common logging, file lock detection, and schematic update methods
+  - Template methods for consistent behavior across all localizers
+  - 198 lines of reusable code
 
 ### Changed
 - README requirements updated to correctly state "KiCad 8.0 or later" (was incorrectly "9.0 or later")
 - Symbol library version format updated to 20241209 (was 20211014)
+- **Major refactoring to eliminate code duplication (Code Review Issue #8)**
+  - Created BaseLocalizer abstract base class with shared functionality
+  - FootprintLocalizer now inherits from BaseLocalizer
+  - SymbolLocalizer now inherits from BaseLocalizer
+  - Eliminated duplicate methods:
+    - log() method removed from both child classes
+    - is_file_locked() consolidated in base class
+    - find_schematic_files() moved to base class
+    - update_schematic_file() centralized with generic implementation
+    - replace_references_in_content() shared method for text replacements
+  - Simplified update_schematic_references() in both localizers (~100 lines reduced to ~40)
+  - Reduced total code duplication by ~150 lines
+  - Improved maintainability, consistency, and extensibility
+  - Maintains full backward compatibility with existing code
 
 ### Fixed
 - Symbol library file handling when file doesn't exist or is empty

@@ -52,25 +52,25 @@ from .constants import (
     PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS,
     ENV_VAR_KIPRJMOD
 )
-from .sexpr_parser import SExpressionParser
+from .base_localizer import BaseLocalizer
 from .library_manager import LibraryManager
-from .backup_manager import BackupManager
 from .utils import (
     expand_kicad_path, safe_read_file, find_schematic_files,
     scan_schematics_for_items
 )
 
 
-class FootprintLocalizer:
+class FootprintLocalizer(BaseLocalizer):
     """!
     @brief Handles localization of footprints and 3D models from global to local libraries
     
     Scans PCB and schematic files, identifies external footprint references, copies
     them to project-local libraries, and updates all references.
     
+    Inherits common functionality from BaseLocalizer.
+    
     @section methods Methods
     - :py:meth:`~FootprintLocalizer.__init__`
-    - :py:meth:`~FootprintLocalizer.log`
     - :py:meth:`~FootprintLocalizer.scan_pcb_footprints`
     - :py:meth:`~FootprintLocalizer.scan_schematic_footprints`
     - :py:meth:`~FootprintLocalizer.copy_footprints`
@@ -79,10 +79,10 @@ class FootprintLocalizer:
     - :py:meth:`~FootprintLocalizer.update_schematic_references`
     
     @section attributes Attributes
-    - logger (Callable): Logger object with info/warning/error methods
-    - parser (SExpressionParser): S-expression parser instance
+    - logger (Callable): Logger object with info/warning/error methods (inherited)
+    - parser (SExpressionParser): S-expression parser instance (inherited)
+    - backup_manager (BackupManager): File backup manager instance (inherited)
     - lib_manager (LibraryManager): Library manager instance
-    - backup_manager (BackupManager): File backup manager instance
     """
     
     def __init__(self, logger: Optional[Callable] = None):
@@ -91,22 +91,8 @@ class FootprintLocalizer:
         
         @param logger: Optional logger object with info/warning/error methods
         """
-        self.logger = logger
-        self.parser = SExpressionParser()
+        super().__init__(logger)
         self.lib_manager = LibraryManager(logger)
-        self.backup_manager = BackupManager(logger)
-    
-    def log(self, level: str, message: str) -> None:
-        """
-        @brief Internal logging helper
-        
-        @param level: Log level (info, warning, error, success)
-        @param message: Message to log
-        """
-        if self.logger:
-            method = getattr(self.logger, level, None)
-            if method:
-                method(message)
     
     def scan_pcb_footprints(self, board) -> Set[Tuple[str, str]]:
         """
@@ -594,15 +580,8 @@ class FootprintLocalizer:
         
         self.log('info', PROGRESS_STEP_UPDATE_SCHEMATICS + "...")
         
-        # Create mapping
-        footprint_map = {}
-        for lib_name, fp_name, _, _ in copied_footprints:
-            old_ref = f"{lib_name}:{fp_name}"
-            new_ref = f"{local_lib_name}:{fp_name}"
-            footprint_map[old_ref] = new_ref
-        
         # Find schematic files
-        schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
+        schematic_files = self.find_schematic_files(project_dir)
         
         if not schematic_files:
             self.log('warning', "No schematic files found")
@@ -613,42 +592,18 @@ class FootprintLocalizer:
         for sch_file in schematic_files:
             self.log('info', f"Processing {os.path.basename(sch_file)}...")
             
-            # Create backup
-            if create_backup:
-                try:
-                    self.backup_manager.create_backup(sch_file)
-                except Exception as e:
-                    self.log('error', f"Failed to create backup for {sch_file}: {e}")
-                    raise
+            # Build replacement list for this file
+            replacements = []
+            for lib_name, fp_name, _, _ in copied_footprints:
+                old_pattern = f'({SEXPR_PROPERTY} "{SEXPR_FOOTPRINT}" "{lib_name}:{fp_name}"'
+                new_pattern = f'({SEXPR_PROPERTY} "{SEXPR_FOOTPRINT}" "{local_lib_name}:{fp_name}"'
+                replacements.append((old_pattern, new_pattern))
             
             try:
-                # Read the schematic file
-                with open(sch_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # Use base class method to update file
+                updated_count = self.update_schematic_file(sch_file, replacements, create_backup)
+                total_updated += updated_count
                 
-                original_content = content
-                file_updated = 0
-                
-                # Replace footprint references
-                for old_ref, new_ref in footprint_map.items():
-                    old_pattern = f'({SEXPR_PROPERTY} "{SEXPR_FOOTPRINT}" "{old_ref}"'
-                    new_pattern = f'({SEXPR_PROPERTY} "{SEXPR_FOOTPRINT}" "{new_ref}"'
-                    
-                    if old_pattern in content:
-                        count = content.count(old_pattern)
-                        content = content.replace(old_pattern, new_pattern)
-                        file_updated += count
-                        self.log('info', f"  ✓ Updated {count} instance(s) of {old_ref} → {new_ref}")
-                
-                # Write back if changed
-                if content != original_content:
-                    with open(sch_file, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    self.log('success', f"  Updated {file_updated} footprint reference(s)")
-                    total_updated += file_updated
-                else:
-                    self.log('info', f"  No updates needed")
-                    
             except Exception as e:
                 self.log('error', f"Failed to update {os.path.basename(sch_file)}: {str(e)}")
                 raise
@@ -659,4 +614,5 @@ class FootprintLocalizer:
             self.log('info', "No footprint references needed updating in schematics")
         
         return total_updated
+
 

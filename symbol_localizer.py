@@ -53,24 +53,24 @@ from .constants import (
     KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK,
     ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC
 )
-from .sexpr_parser import SExpressionParser
-from .backup_manager import BackupManager
+from .base_localizer import BaseLocalizer
 from .utils import (
     expand_kicad_path, safe_read_file, find_schematic_files,
     scan_schematics_for_items
 )
 
 
-class SymbolLocalizer:
+class SymbolLocalizer(BaseLocalizer):
     """!
     @brief Handles localization of symbols from global to local libraries
     
     Scans schematic files, identifies external symbol references, copies
     them to project-local symbol libraries, and updates all references.
     
+    Inherits common functionality from BaseLocalizer.
+    
     @section methods Methods
     - :py:meth:`~SymbolLocalizer.__init__`
-    - :py:meth:`~SymbolLocalizer.log`
     - :py:meth:`~SymbolLocalizer.scan_schematic_symbols`
     - :py:meth:`~SymbolLocalizer.find_symbols_in_sexpr`
     - :py:meth:`~SymbolLocalizer.copy_symbols`
@@ -83,9 +83,9 @@ class SymbolLocalizer:
     - :py:meth:`~SymbolLocalizer.update_sym_lib_table`
     
     @section attributes Attributes
-    - logger (Callable): Logger object with info/warning/error methods
-    - parser (SExpressionParser): S-expression parser instance
-    - backup_manager (BackupManager): File backup manager instance
+    - logger (Callable): Logger object with info/warning/error methods (inherited)
+    - parser (SExpressionParser): S-expression parser instance (inherited)
+    - backup_manager (BackupManager): File backup manager instance (inherited)
     """
     
     def __init__(self, logger: Optional[Callable] = None):
@@ -94,21 +94,7 @@ class SymbolLocalizer:
         
         @param logger: Optional logger object with info/warning/error methods
         """
-        self.logger = logger
-        self.parser = SExpressionParser()
-        self.backup_manager = BackupManager(logger)
-    
-    def log(self, level: str, message: str) -> None:
-        """
-        @brief Internal logging helper
-        
-        @param level: Log level (info, warning, error, success)
-        @param message: Message to log
-        """
-        if self.logger:
-            method = getattr(self.logger, level, None)
-            if method:
-                method(message)
+        super().__init__(logger)
     
     def scan_schematic_symbols(self, project_dir: str) -> Set[Tuple[str, str]]:
         """
@@ -468,21 +454,6 @@ class SymbolLocalizer:
             self.log('error', f"Failed to write symbol library: {e}")
             raise
     
-    def _is_file_locked(self, filepath: str) -> bool:
-        """
-        @brief Check if a file is locked/open by another process
-        
-        @param filepath: Path to file to check
-        @return True if file is locked, False otherwise
-        """
-        try:
-            # Try to open file in exclusive mode
-            with open(filepath, 'r+', encoding='utf-8') as f:
-                pass
-            return False
-        except (IOError, PermissionError):
-            return True
-    
     def update_schematic_references(self, copied_symbols: List[Tuple[str, str, list]], 
                                    project_dir: str, local_lib_name: str, create_backups: bool):
         """
@@ -499,25 +470,15 @@ class SymbolLocalizer:
         
         self.log('info', "Updating schematic symbol library references...")
         
-        # Create a mapping of old library names to new library name
-        old_libs = set()
-        for lib_name, sym_name, _ in copied_symbols:
-            old_libs.add(lib_name)
-        
         # Find all schematic files
-        schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
+        schematic_files = self.find_schematic_files(project_dir)
         
         if not schematic_files:
             self.log('warning', "No schematic files found")
             return
         
-        # Note: File lock check is now done upfront in bakery_plugin.py
-        # This is a redundant safety check
-        locked_files = []
-        for sch_file in schematic_files:
-            if self._is_file_locked(sch_file):
-                locked_files.append(os.path.basename(sch_file))
-        
+        # Check for locked files
+        locked_files = self.check_schematic_locks(project_dir)
         if locked_files:
             self.log('warning', f"The following schematic file(s) appear to be open: {', '.join(locked_files)}")
             self.log('error', "Cannot update schematics - files are locked")
@@ -528,42 +489,20 @@ class SymbolLocalizer:
         for sch_file in schematic_files:
             self.log('info', f"Processing {os.path.basename(sch_file)}...")
             
+            # Build replacement list for this file
+            replacements = []
+            for lib_name, sym_name, _ in copied_symbols:
+                old_ref = f'"{lib_name}:{sym_name}"'
+                new_ref = f'"{local_lib_name}:{sym_name}"'
+                replacements.append((old_ref, new_ref))
+            
             try:
-                # Create backup if requested
-                if create_backups:
-                    self.backup_manager.create_backup(sch_file)
-                
-                # Read the schematic file
-                with open(sch_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Track if any changes were made
-                original_content = content
-                file_updated = 0
-                
-                # Replace lib_id references using simple find-and-replace
-                # Format in schematic: (lib_id "Library:Symbol")
-                for lib_name, sym_name, _ in copied_symbols:
-                    old_ref = f'"{lib_name}:{sym_name}"'
-                    new_ref = f'"{local_lib_name}:{sym_name}"'
-                    
-                    if old_ref in content:
-                        count = content.count(old_ref)
-                        content = content.replace(old_ref, new_ref)
-                        file_updated += count
-                        self.log('info', f"  ✓ Updated {count} reference(s): {lib_name}:{sym_name} → {local_lib_name}:{sym_name}")
-                
-                # Write back if changes were made
-                if content != original_content:
-                    with open(sch_file, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    self.log('success', f"  Updated {file_updated} symbol reference(s) in {os.path.basename(sch_file)}")
-                    total_updated += file_updated
-                else:
-                    self.log('info', f"  No updates needed in {os.path.basename(sch_file)}")
+                # Use base class method to update file
+                updated_count = self.update_schematic_file(sch_file, replacements, create_backups)
+                total_updated += updated_count
                     
             except Exception as e:
-                self.log('error', f"  Failed to update {os.path.basename(sch_file)}: {str(e)}")
+                self.log('error', f"Failed to update {os.path.basename(sch_file)}: {str(e)}")
         
         if total_updated > 0:
             self.log('success', f"Updated {total_updated} total symbol reference(s) in schematic files")

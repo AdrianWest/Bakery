@@ -2,6 +2,29 @@
 
 **Localize all KiCad symbols, footprints, and 3D models to project libraries**
 
+---
+
+## ⚠️ **IMPORTANT: Use Version Control!** ⚠️
+
+### **This plugin makes extensive changes to your schematic and PCB files.**
+
+### **Put your KiCad project on a Git repository BEFORE running this plugin!**
+
+**Why?**
+- Bakery modifies `.kicad_sch` and `.kicad_pcb` files extensively
+- The easiest way to recover from an unwanted conversion is to revert from Git
+- Backups are created automatically, but Git gives you full project history
+
+**Quick Git setup (if you don't have one):**
+```bash
+cd /path/to/your/project
+git init
+git add .
+git commit -m "Before Bakery localization"
+```
+
+---
+
 ## Overview
 
 Bakery is a KiCad plugin that automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures:

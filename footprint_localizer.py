@@ -291,7 +291,7 @@ class FootprintLocalizer(BaseLocalizer):
                             self.log('error', f"      ✗ Failed to copy {model_filename}: {str(e)}")
                             failed_count += 1
                 else:
-                    self.log('warning', f"      ✗ Model file not found: {expanded_path}")
+                    self.log('warning', f"      ✗ Model file not found: {os.path.normpath(expanded_path)}")
                     failed_count += 1
             
             # Queue footprint for updating
@@ -344,7 +344,7 @@ class FootprintLocalizer(BaseLocalizer):
         model_filename = os.path.basename(expanded_path)
         
         if not os.path.exists(expanded_path):
-            self.log('warning', f"      ✗ Model file not found: {expanded_path}")
+            self.log('warning', f"      ✗ Model file not found: {os.path.normpath(expanded_path)}")
             return False, None, None
         
         # Check if already copied

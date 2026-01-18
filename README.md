@@ -33,15 +33,6 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 - **Self-contained projects**: Everything needed is in the project folder
 
 ## Installation
-
-### Windows - Quick Install (Recommended)
-
-1. Download or clone this repository
-2. Run `install.bat` - this will automatically copy the plugin to your KiCad plugins directory
-3. Restart KiCad
-
-### Manual Installation
-
 1. Download or clone this repository
 2. Copy the `Bakery` folder to your KiCad plugins directory:
    - **Windows**: `%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\`
@@ -113,14 +104,6 @@ Bakery/
 └── metadata.json            # Plugin metadata for KiCad Plugin Manager
 ```
 
-### Testing
-
-1. Make changes to the Python files
-2. Restart KiCad completely
-3. Open a test project
-4. Run the plugin from **Tools** > **External Plugins**
-5. Check the log window for detailed output
-
 ## Features
 
 ✅ **Symbol Localization**: Automatically copies all symbols from global libraries to your project
@@ -133,11 +116,11 @@ Bakery/
 ✅ **Detailed Logging**: Separate panes for info, warnings, and errors
 ✅ **Configurable**: Choose library names, directories, and backup options
 ✅ **Path Safety**: Validates all file operations to prevent data loss
-✅ **KiCad 8 & 9 Support**: Compatible with both KiCad version 8 and 9
+✅ **KiCad 9 Support**: Compatible with both KiCad version 9
 
 ## Requirements
 
-- KiCad 8.0 or later
+- KiCad 9.0 or later
 - Python 3.x (bundled with KiCad)
 - wxPython (bundled with KiCad)
 
@@ -172,10 +155,92 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 - [x] PCB and schematic file updates
 - [x] Symbol and footprint library table management
 - [x] Automatic timestamped backup creation
-- [x] KiCad 8 & 9 environment variable compatibility
+- [x] KiCad 9 environment variable compatibility
 - [x] Comprehensive Doxygen documentation
 - [x] Support for hierarchical schematics (tested)
-- [ ] Full testing and bug fixes
+- [x] Full testing and bug fixes
 
 ### Planned for Future Versions
 - [ ] Additional features based on user feedback
+
+## Testing
+
+### Unit Tests
+
+Run the comprehensive unit test suite (151 tests covering all modules):
+
+```bash
+cd "Unit Test"
+python run_tests.py              # Run all tests
+python run_tests.py -v           # Verbose output
+python run_tests.py --coverage   # With coverage report (requires: pip install coverage)
+python run_tests.py --list       # List all available tests
+```
+
+**Test Coverage:**
+- ✅ 151 tests across 10 test modules
+- ✅ All modules covered: constants, utils, sexpr_parser, backup_manager, library_manager, base_localizer, footprint_localizer, symbol_localizer, ui_components, bakery_plugin
+- ✅ 0 failures, 0 errors, 0 skipped
+
+See [Unit Test/README.md](Unit%20Test/README.md) for detailed testing documentation.
+
+### Manual Testing in KiCad
+
+**Test Projects:**
+
+Two functional test projects are provided in `Functional Test/`:
+- **Ki-Test 01** - Should report 1 expected error (missing 3D model file)
+- **Ki-Test 02** - Should complete with no errors
+
+**Testing Procedure:**
+
+1. Copy test projects from `C:\GIT_HUB\Bakery\Functional Test` to your KiCad projects folder
+2. Make changes to the Bakery Python files (if developing)
+3. Restart KiCad completely
+4. Open a test project (e.g., Ki-Test 01)
+5. Run the plugin from **Tools** > **External Plugins** > **Bakery - Localize Symbols, Footprints, and 3d Models**
+6. Check the log window for detailed output
+
+**Expected Results:**
+- **Ki-Test 01**: Should report 1 error:
+  ```
+  ✗ Model file not found: C:\Program Files\KiCad\9.0\share\kicad\3dmodels\Button_Switch_THT.3dshapes\KSA_Tactile_SPST.step
+  • 1 models could not be copied
+  ```
+- **Ki-Test 02**: Should complete with no errors
+
+**Verification Checklist:**
+
+After running the plugin, verify the following:
+
+**In the Schematic (`.kicad_sch`):**
+- [ ] All symbol `lib_id` fields now reference the local library (e.g., `"MySymbols:R"` instead of `"Device:R"`)
+- [ ] Symbol properties are preserved (reference designators, values, etc.)
+- [ ] Schematic visual appearance is unchanged
+- [ ] No missing symbols or broken references
+
+**In the PCB (`.kicad_pcb`):**
+- [ ] All footprint `fp_text` references updated to local library (e.g., `"MyLib:R_0805"`)
+- [ ] 3D model paths updated to `${KIPRJMOD}/3D Models/` for copied models
+- [ ] Footprint positions, rotations, and layers unchanged
+- [ ] Copper traces, zones, and routing intact
+- [ ] PCB visual appearance identical to before
+
+**In the Project Files:**
+- [ ] `fp-lib-table` contains entry for local footprint library
+- [ ] `sym-lib-table` contains entry for local symbol library
+- [ ] Local libraries created: `MyLib.pretty/`, `Symbols/MySymbols.kicad_sym`, `3D Models/`
+- [ ] Backup files created with timestamps (if enabled)
+- [ ] All footprints copied to `MyLib.pretty/`
+- [ ] All symbols present in `Symbols/MySymbols.kicad_sym`
+- [ ] 3D models copied to `3D Models/` folder
+
+**Functional Tests:**
+- [ ] Open schematic - no missing symbol warnings
+- [ ] Open PCB - no missing footprint warnings
+- [ ] 3D viewer shows models correctly (except intentionally missing ones)
+- [ ] New Symbol libaries should open in the editor without error
+- [ ] New Footprint libaries should open in the editor without error
+- [ ] DRC (Design Rule Check) runs without new errors
+- [ ] ERC (Electrical Rule Check) runs without new errors
+- [ ] Project can be opened on a different computer without KiCad global libraries

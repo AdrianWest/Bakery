@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Automated release package builder (create_release.bat)**
+  - Command-line parameter for version specification
+  - Automatic creation of KiCad PCM-compliant directory structure
+  - ZIP archive generation with correct folder hierarchy
+  - SHA256 hash calculation for package verification
+  - File size calculation (download_size and install_size)
+  - Automatic cleanup of temporary release directory
+  - Displays all metadata values needed for metadata.json update
 - **Named constants for all magic numbers** to improve code maintainability
   - PROGRESS_BAR_RANGE, PROGRESS_INITIAL, PROGRESS_COMPLETE - Progress bar settings
   - PROGRESS_PCT_* constants for all 11 progress step percentages
@@ -96,6 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Progress bar now resets to 0 after completion
 
 ### Fixed
+- **Icon path compatibility with KiCad plugin installation structure**
+  - Updated icon_file_name path in bakery_plugin.py to work with installed directory structure
+  - Changed from `os.path.dirname(os.path.dirname(__file__))` to `os.path.dirname(__file__)`
+  - Ensures plugin icon displays correctly in KiCad toolbar after PCM installation
 - Symbol library file handling when file doesn't exist or is empty
   - Added validation to detect empty or corrupted symbol library files
   - Properly creates new library structure if existing file is invalid

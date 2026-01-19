@@ -4,15 +4,14 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
 
 ## Pre-Release Preparation
 
-- [ ] **Complete all testing**
-  - Test on Windows with KiCad 8.0
+- [O] **Complete all testing**
   - Test on Windows with KiCad 9.0
   - Test on Linux with KiCad 9.0 (if possible)
   - Test with various project types (simple and complex)
   - Verify all features work correctly
   - Fix any remaining bugs
 
-- [ ] **Update version number** (if needed)
+- [0] **Update version number** (if needed)
   - Update `metadata.json` version field
   - Update `constants.py` PLUGIN_VERSION constant
   - Update CHANGELOG.md with release date
@@ -24,8 +23,8 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   - All Python files have proper Doxygen docstrings
   - LICENSE file is present and correct
 
-- [ ] **Verify icon meets requirements**
-  - Bakery_Icon.png is at least 64x64 pixels (256x256 recommended)
+- [0] **Verify icon meets requirements**
+  - resources/Bakery_Icon.png is at least 64x64 pixels (256x256 recommended)
   - Icon is clear and recognizable at small sizes
   - Icon is in PNG format
 
@@ -35,20 +34,22 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   ```
   Bakery-1.0.0/
   ├── plugins/
-  │   └── Bakery/
-  │       ├── __init__.py
-  │       ├── bakery_plugin.py
-  │       ├── constants.py
-  │       ├── footprint_localizer.py
-  │       ├── symbol_localizer.py
-  │       ├── library_manager.py
-  │       ├── sexpr_parser.py
-  │       ├── ui_components.py
-  │       ├── backup_manager.py
-  │       ├── utils.py
-  │       ├── metadata.json
-  │       ├── Bakery_Icon.png
-  │       └── LICENSE
+  │   ├── __init__.py
+  │   ├── bakery_plugin.py
+  │   ├── base_localizer.py
+  │   ├── constants.py
+  │   ├── footprint_localizer.py
+  │   ├── symbol_localizer.py
+  │   ├── library_manager.py
+  │   ├── sexpr_parser.py
+  │   ├── ui_components.py
+  │   ├── backup_manager.py
+  │   ├── utils.py
+  │   └── metadata.json
+  ├── resources/
+  │   ├── Bakery_Icon.png
+  │   └── Bakery_Icon_256x256.png
+  ├── LICENSE
   ├── metadata.json (copy at root)
   └── README.md (optional but recommended)
   ```

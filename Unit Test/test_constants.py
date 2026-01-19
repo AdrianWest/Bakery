@@ -9,10 +9,10 @@ import sys
 import os
 import unittest
 
-# Use import helper for modules with relative imports (constants doesn't have relative imports but for consistency)
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add path to plugins directory
+repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+bakery_dir = os.path.join(repo_dir, 'plugins')
+sys.path.insert(0, bakery_dir)
 
 import constants
 

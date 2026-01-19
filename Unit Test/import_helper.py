@@ -15,7 +15,9 @@ class BakeryImporter:
     """Helper class to import Bakery modules for testing"""
     
     def __init__(self):
-        self.bakery_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Point to plugins directory
+        repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.bakery_dir = os.path.join(repo_dir, 'plugins')
         self.modules = {}
         self._setup_package()
     

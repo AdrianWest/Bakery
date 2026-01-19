@@ -43,7 +43,7 @@ to maintain consistency and simplify maintenance.
 
 
 # Plugin metadata
-PLUGIN_VERSION = "0.2.0"
+PLUGIN_VERSION = "1.0.0"
 PLUGIN_NAME = "Bakery - Localize Symbols, Footprints, and 3D Models"
 PLUGIN_CATEGORY = "Library Management"
 PLUGIN_DESCRIPTION = "Localize all symbols and footprints to project libraries"

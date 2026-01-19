@@ -133,6 +133,8 @@ echo.
 
 REM Create a temporary PowerShell script to update metadata.json
 echo $json = Get-Content 'metadata.json' -Raw ^| ConvertFrom-Json > update_metadata.ps1
+echo $json.versions[0].version = '%VERSION%' >> update_metadata.ps1
+echo $json.versions[0].download_url = 'https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%' >> update_metadata.ps1
 echo $json.versions[0].download_sha256 = '%SHA256%' >> update_metadata.ps1
 echo $json.versions[0].download_size = [int]%ZIP_SIZE% >> update_metadata.ps1
 echo $json.versions[0].install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
@@ -164,8 +166,7 @@ echo Package: %ZIP_FILE%
 echo.
 echo Next steps:
 echo 1. Create GitHub release and upload %ZIP_FILE%
-echo 2. Update download_url in metadata.json with GitHub release URL:
-echo    https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%
+echo 2. Verify download_url in metadata.json is correct
 echo 3. Commit and push updated metadata.json
 echo 4. Submit to KiCad PCM repository
 echo.

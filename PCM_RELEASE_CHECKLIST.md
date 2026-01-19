@@ -32,7 +32,7 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
 
 - [ ] **Create release directory structure**
   ```
-  Bakery-1.0.1/
+  Bakery-1.0.2/
   ├── plugins/
   │   ├── __init__.py
   │   ├── bakery_plugin.py
@@ -55,14 +55,14 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   ```
 
 - [ ] **Create ZIP package**
-  - Archive the entire Bakery-1.0.1 directory as Bakery-1.0.1.zip
+  - Archive the entire Bakery-1.0.2 directory as Bakery-1.0.2.zip
   - Ensure ZIP contains the correct folder structure
   - Test extracting the ZIP to verify structure
 
 - [ ] **Calculate file sizes and hash**
-  - Get ZIP file size in bytes: `(Get-Item Bakery-1.0.1.zip).Length`
-  - Calculate SHA256 hash: `certutil -hashfile Bakery-1.0.1.zip SHA256`
-  - Estimate installed size: `(Get-ChildItem -Recurse Bakery-1.0.1 | Measure-Object -Property Length -Sum).Sum`
+  - Get ZIP file size in bytes: `(Get-Item Bakery-1.0.2.zip).Length`
+  - Calculate SHA256 hash: `certutil -hashfile Bakery-1.0.2.zip SHA256`
+  - Estimate installed size: `(Get-ChildItem -Recurse Bakery-1.0.2 | Measure-Object -Property Length -Sum).Sum`
 
 - [ ] **Update metadata.json with actual values**
   - Update `download_sha256` with calculated hash
@@ -74,21 +74,21 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
 
 - [ ] **Create Git tag**
   ```powershell
-  git tag -a v1.0.1 -m "Release version 1.0.1"
-  git push origin v1.0.1
+  git tag -a v1.0.2 -m "Release version 1.0.2"
+  git push origin v1.0.2
   ```
 
 - [ ] **Create GitHub Release**
   - Go to https://github.com/AdrianWest/Bakery/releases/new
-  - Select tag: v1.0.1
-  - Release title: "Bakery v1.0.1"
+  - Select tag: v1.0.2
+  - Release title: "Bakery v1.0.2"
   - Description: Copy from CHANGELOG.md
-  - Attach Bakery-1.0.1.zip as binary asset
+  - Attach Bakery-1.0.2.zip as binary asset
   - Publish release
 
 - [ ] **Verify download URL**
   - Copy the direct download URL of the ZIP from GitHub release
-  - URL should be: `https://github.com/AdrianWest/Bakery/releases/download/v1.0.1/Bakery-1.0.1.zip`
+  - URL should be: `https://github.com/AdrianWest/Bakery/releases/download/v1.0.2/Bakery-1.0.2.zip`
   - Verify URL works by downloading the file
 
 - [ ] **Update metadata.json one final time**
@@ -114,7 +114,7 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   - Go to https://gitlab.com/kicad/addons/metadata/-/merge_requests
   - Click "New merge request"
   - Select your fork and branch
-  - Title: "Update Bakery plugin to v1.0.1"
+  - Title: "Update Bakery plugin to v1.0.2"
   - Description: Brief description of the plugin and what it does
   - Submit merge request
 
@@ -164,20 +164,20 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
 
 ### Calculate SHA256 (PowerShell)
 ```powershell
-certutil -hashfile Bakery-1.0.1.zip SHA256
+certutil -hashfile Bakery-1.0.2.zip SHA256
 ```
 
 ### Get file size (PowerShell)
 ```powershell
-(Get-Item Bakery-1.0.1.zip).Length
+(Get-Item Bakery-1.0.2.zip).Length
 ```
 
 ### Get folder size (PowerShell)
 ```powershell
-(Get-ChildItem -Recurse Bakery-1.0.1 | Measure-Object -Property Length -Sum).Sum
+(Get-ChildItem -Recurse Bakery-1.0.2 | Measure-Object -Property Length -Sum).Sum
 ```
 
 ### Create ZIP (PowerShell)
 ```powershell
-Compress-Archive -Path Bakery-1.0.1 -DestinationPath Bakery-1.0.1.zip
+Compress-Archive -Path Bakery-1.0.2 -DestinationPath Bakery-1.0.2.zip
 ```

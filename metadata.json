@@ -1,33 +1,43 @@
 {
-    "$schema": "https://go.kicad.org/pcm/schemas/v1",
-    "name": "Bakery",
-    "description": "Localize KiCad symbols, footprints, and 3D models to project libraries",
-    "description_full": "Bakery automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures project portability by eliminating external library dependencies and provides version stability by preventing changes when global libraries are updated. Features include dual scanning of PCB and schematic files, automatic backup creation, progress tracking with detailed logging, and support for both KiCad 8 and 9.",
-    "identifier": "com.github.adrianwest.bakery",
-    "type": "plugin",
-    "author": {
-        "name": "Adrian West",
-        "contact": {
-            "web": "https://github.com/AdrianWest/Bakery"
-        }
-    },
-    "license": "GPL-3.0",
-    "resources": {
-        "homepage": "https://github.com/AdrianWest/Bakery",
-        "repository": "https://github.com/AdrianWest/Bakery"
-    },
-    "tags": ["pcbnew", "library", "symbols", "footprints", "localization", "3d-models", "project-management"],
-    "keep_on_update": [],
-    "versions": [
-        {
-            "version": "1.0.0",
-            "status": "stable",
-            "kicad_version": "9.0",
-            "kicad_version_max": "9.99",
-            "download_url": "https://github.com/AdrianWest/Bakery/releases/download/v1.0.0/Bakery-1.0.0.zip",
-            "download_sha256": "d05ebd26493fc0bea743b1c0a46e63b9a7ccb268a20c722f72515947186a99f1",
-            "download_size": 138686,
-            "install_size": 371792
-        }
-    ]
+    "$schema":  "https://go.kicad.org/pcm/schemas/v1",
+    "name":  "Bakery",
+    "description":  "Localize KiCad symbols, footprints, and 3D models to project libraries",
+    "description_full":  "Bakery automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures project portability by eliminating external library dependencies and provides version stability by preventing changes when global libraries are updated. Features include dual scanning of PCB and schematic files, automatic backup creation, progress tracking with detailed logging, and support for both KiCad 8 and 9.",
+    "identifier":  "com.github.adrianwest.bakery",
+    "type":  "plugin",
+    "author":  {
+                   "name":  "Adrian West",
+                   "contact":  {
+                                   "web":  "https://github.com/AdrianWest/Bakery"
+                               }
+               },
+    "license":  "GPL-3.0",
+    "resources":  {
+                      "homepage":  "https://github.com/AdrianWest/Bakery",
+                      "repository":  "https://github.com/AdrianWest/Bakery"
+                  },
+    "tags":  [
+                 "pcbnew",
+                 "library",
+                 "symbols",
+                 "footprints",
+                 "localization",
+                 "3d-models",
+                 "project-management"
+             ],
+    "keep_on_update":  [
+
+                       ],
+    "versions":  [
+                     {
+                         "version":  "1.0.0",
+                         "status":  "stable",
+                         "kicad_version":  "9.0",
+                         "kicad_version_max":  "9.99",
+                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v1.0.0/Bakery-1.0.0.zip",
+                         "download_sha256":  "e229ace6e0e6f8f26eff5e58d3373e8a99fb26864eff51d575614f13954381c8",
+                         "download_size":  66140,
+                         "install_size":  204549
+                     }
+                 ]
 }

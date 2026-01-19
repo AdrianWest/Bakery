@@ -27,3 +27,7 @@ fp-info-cache
 
 # Testing
 test_projects/
+
+# Releases
+Bakery-*.zip
+Bakery-*/

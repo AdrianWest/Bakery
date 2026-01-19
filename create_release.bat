@@ -95,6 +95,9 @@ if not exist "%ZIP_FILE%" (
     exit /b 1
 )
 
+echo Cleaning up release directory...
+rmdir /s /q "%RELEASE_DIR%"
+
 echo.
 echo ============================================================================
 echo Calculating metadata for metadata.json...
@@ -128,8 +131,8 @@ echo Updating metadata.json...
 echo ============================================================================
 echo.
 
-REM Update metadata.json using PowerShell
-powershell -Command "$json = Get-Content 'metadata.json' -Raw | ConvertFrom-Json; $json.versions[0].download_sha256 = '%SHA256%'; $json.versions[0].download_size = [int]%ZIP_SIZE%; $json.versions[0].install_size = [int]%INSTALL_SIZE%; $json.versions[0].status = 'stable'; $json | ConvertTo-Json -Depth 10 | Set-Content 'metadata.json'"
+REM Update metadata.json using PowerShell with error handling
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $json = Get-Content 'metadata.json' -Raw | ConvertFrom-Json; $json.versions[0].download_sha256 = '%SHA256%'; $json.versions[0].download_size = [int]%ZIP_SIZE%; $json.versions[0].install_size = [int]%INSTALL_SIZE%; $json.versions[0].status = 'stable'; $json | ConvertTo-Json -Depth 10 | Set-Content 'metadata.json' -Encoding UTF8; exit 0 } catch { Write-Host 'Error:' $_.Exception.Message; exit 1 }"
 
 if %ERRORLEVEL% EQU 0 (
     echo metadata.json updated successfully!

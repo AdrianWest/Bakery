@@ -124,22 +124,41 @@ echo SHA256 hash: %SHA256%
 
 echo.
 echo ============================================================================
+echo Updating metadata.json...
+echo ============================================================================
+echo.
+
+REM Update metadata.json using PowerShell
+powershell -Command "$json = Get-Content 'metadata.json' -Raw | ConvertFrom-Json; $json.versions[0].download_sha256 = '%SHA256%'; $json.versions[0].download_size = [int]%ZIP_SIZE%; $json.versions[0].install_size = [int]%INSTALL_SIZE%; $json.versions[0].status = 'stable'; $json | ConvertTo-Json -Depth 10 | Set-Content 'metadata.json'"
+
+if %ERRORLEVEL% EQU 0 (
+    echo metadata.json updated successfully!
+    echo   - download_sha256: %SHA256%
+    echo   - download_size: %ZIP_SIZE%
+    echo   - install_size: %INSTALL_SIZE%
+    echo   - status: stable
+) else (
+    echo WARNING: Failed to update metadata.json automatically
+    echo Please update manually with these values:
+    echo   "download_size": %ZIP_SIZE%,
+    echo   "download_sha256": "%SHA256%",
+    echo   "install_size": %INSTALL_SIZE%,
+    echo   "status": "stable"
+)
+
+echo.
+echo ============================================================================
 echo Release Package Created Successfully!
 echo ============================================================================
 echo.
 echo Package: %ZIP_FILE%
 echo Directory: %RELEASE_DIR%\
 echo.
-echo IMPORTANT: Update your metadata.json with these values:
-echo.
-echo   "download_size": %ZIP_SIZE%,
-echo   "download_sha256": "%SHA256%",
-echo   "install_size": %INSTALL_SIZE%,
-echo.
 echo Next steps:
-echo 1. Update metadata.json with the values above
-echo 2. Create GitHub release and upload %ZIP_FILE%
-echo 3. Update download_url in metadata.json with GitHub release URL
+echo 1. Create GitHub release and upload %ZIP_FILE%
+echo 2. Update download_url in metadata.json with GitHub release URL:
+echo    https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%
+echo 3. Commit and push updated metadata.json
 echo 4. Submit to KiCad PCM repository
 echo.
 echo See PCM_RELEASE_CHECKLIST.md for complete release process.

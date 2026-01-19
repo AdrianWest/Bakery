@@ -1,0 +1,691 @@
+"""
+Copyright (C) 2026 Adrian West
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
+"""!
+@file footprint_localizer.py
+
+@brief Footprint localization for Bakery plugin
+
+Handles localization of PCB footprints and 3D models:
+- Scanning PCB and schematics for footprint references
+- Copying footprints to local project libraries
+- Localizing 3D model files
+- Updating footprint references in PCB and schematics
+
+@section description_footprint_localizer Detailed Description
+This module provides the FootprintLocalizer class which manages footprint and
+3D model localization. It scans both PCB (.kicad_pcb) and schematic (.kicad_sch)
+files to find all footprint references, copies .kicad_mod files to local .pretty
+libraries, and localizes associated 3D models (STEP, WRL, etc.).
+
+@section notes_footprint_localizer Notes
+- Scans both PCB and schematic files for comprehensive coverage
+- Preserves 3D model file formats and structure
+- Updates model paths to use ${KIPRJMOD} variable
+"""
+
+import os
+import shutil
+import glob
+from datetime import datetime
+from typing import List, Tuple, Optional, Callable, Set
+
+from .constants import (
+    EXTENSION_FOOTPRINT, EXTENSION_FOOTPRINT_LIB, EXTENSION_PCB,
+    EXTENSION_SCHEMATIC, SEXPR_FOOTPRINT, SEXPR_PROPERTY, SEXPR_MODEL,
+    PROGRESS_STEP_COPY_FOOTPRINTS, PROGRESS_STEP_SCAN_PCB,
+    PROGRESS_STEP_SCAN_SCHEMATICS, PROGRESS_STEP_COPY_3D_MODELS,
+    PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS,
+    ENV_VAR_KIPRJMOD
+)
+from .base_localizer import BaseLocalizer
+from .library_manager import LibraryManager
+from .utils import (
+    expand_kicad_path, safe_read_file, find_schematic_files,
+    scan_schematics_for_items
+)
+
+
+class FootprintLocalizer(BaseLocalizer):
+    """!
+    @brief Handles localization of footprints and 3D models from global to local libraries
+    
+    Scans PCB and schematic files, identifies external footprint references, copies
+    them to project-local libraries, and updates all references.
+    
+    Inherits common functionality from BaseLocalizer.
+    
+    @section methods Methods
+    - :py:meth:`~FootprintLocalizer.__init__`
+    - :py:meth:`~FootprintLocalizer.scan_pcb_footprints`
+    - :py:meth:`~FootprintLocalizer.scan_schematic_footprints`
+    - :py:meth:`~FootprintLocalizer.copy_footprints`
+    - :py:meth:`~FootprintLocalizer.localize_3d_models`
+    - :py:meth:`~FootprintLocalizer.update_pcb_references`
+    - :py:meth:`~FootprintLocalizer.update_schematic_references`
+    
+    @section attributes Attributes
+    - logger (Callable): Logger object with info/warning/error methods (inherited)
+    - parser (SExpressionParser): S-expression parser instance (inherited)
+    - backup_manager (BackupManager): File backup manager instance (inherited)
+    - lib_manager (LibraryManager): Library manager instance
+    """
+    
+    def __init__(self, logger: Optional[Callable] = None):
+        """
+        @brief Initialize the footprint localizer
+        
+        @param logger: Optional logger object with info/warning/error methods
+        """
+        super().__init__(logger)
+        self.lib_manager = LibraryManager(logger)
+    
+    def scan_pcb_footprints(self, board) -> Set[Tuple[str, str]]:
+        """
+        @brief Scan PCB for footprint references
+        
+        @param board: KiCad BOARD object
+        @return Set of (library, footprint) tuples
+        """
+        footprints = set()
+        
+        self.log('info', PROGRESS_STEP_SCAN_PCB + "...")
+        
+        # Count footprints
+        fp_count = sum(1 for _ in board.GetFootprints())
+        self.log('info', f"Found {fp_count} footprints on the PCB")
+        
+        # Get footprints
+        for fp in board.GetFootprints():
+            try:
+                fpid = fp.GetFPID()
+                fp_name = fpid.GetLibItemName().__str__()
+                lib_name = fpid.GetLibNickname().__str__()
+                
+                if lib_name and fp_name:
+                    footprints.add((lib_name, fp_name))
+                    self.log('info', f"  - {lib_name}:{fp_name}")
+                    
+            except AttributeError as e:
+                self.log('error', f"Error reading footprint: {e}")
+                continue
+        
+        return footprints
+    
+    def scan_schematic_footprints(self, project_dir: str) -> Set[Tuple[str, str]]:
+        """
+        @brief Scan schematic files for footprint references
+        """
+        return scan_schematics_for_items(
+            project_dir,
+            self.parser,
+            self.parser.find_footprints,
+            self.logger,
+            "Scanning schematics for footprints"
+        )
+    
+    def find_and_copy_footprint(self, lib_name: str, fp_name: str, 
+                                  local_lib_path: str) -> Optional[Tuple[str, str, str, str]]:
+        """
+        @brief Find and copy a single footprint to local library
+        
+        @param lib_name: Source library name
+        @param fp_name: Footprint name
+        @param local_lib_path: Destination local library path
+        @return Tuple of (lib_name, fp_name, source_path, dest_path) if successful, None otherwise
+        """
+        # Find source footprint path
+        lib_path = self.lib_manager.find_footprint_library_path(lib_name)
+        
+        if not lib_path:
+            self.log('warning', f"✗ Could not find library: {lib_name}")
+            return None
+        
+        source_fp_path = os.path.join(lib_path, f"{fp_name}{EXTENSION_FOOTPRINT}")
+        
+        if not os.path.exists(source_fp_path):
+            self.log('warning', f"✗ Could not find source for {lib_name}:{fp_name}")
+            return None
+        
+        # Destination path in local library
+        dest_fp_path = os.path.join(local_lib_path, f"{fp_name}{EXTENSION_FOOTPRINT}")
+        
+        # Copy the footprint file
+        shutil.copy2(source_fp_path, dest_fp_path)
+        self.log('info', f"✓ Copied {lib_name}:{fp_name}")
+        return (lib_name, fp_name, source_fp_path, dest_fp_path)
+    
+    def filter_footprints_to_copy(self, footprints: Set[Tuple[str, str]], 
+                                    local_lib_name: str) -> Set[Tuple[str, str]]:
+        """
+        @brief Filter out footprints already in local library
+        
+        @param footprints: Set of (library, footprint) tuples
+        @param local_lib_name: Name of local library
+        @return Set of footprints to copy
+        """
+        footprints_to_copy = set()
+        skipped_count = 0
+        
+        for lib_name, fp_name in footprints:
+            if lib_name == local_lib_name:
+                self.log('info', f"→ Skipping {lib_name}:{fp_name} (already in local library)")
+                skipped_count += 1
+            else:
+                footprints_to_copy.add((lib_name, fp_name))
+        
+        if skipped_count > 0:
+            self.log('info', f"Skipped {skipped_count} footprints already in {local_lib_name}")
+        
+        return footprints_to_copy
+    
+    def copy_footprints(self, footprints: Set[Tuple[str, str]], project_dir: str, 
+                       local_lib_name: str) -> List[Tuple[str, str, str, str]]:
+        """
+        @brief Copy footprints to local library
+        
+        @param footprints: Set of (library, footprint) tuples to copy
+        @param project_dir: Project directory path
+        @param local_lib_name: Name of local library
+        @return List of (lib_name, fp_name, source_path, dest_path) tuples for copied footprints
+        """
+        self.log('info', PROGRESS_STEP_COPY_FOOTPRINTS + "...")
+        
+        # Create local library
+        local_lib_path = self.lib_manager.create_local_footprint_library(
+            project_dir, local_lib_name)
+        
+        # Filter out footprints already in local library
+        footprints_to_copy = self.filter_footprints_to_copy(footprints, local_lib_name)
+        
+        # Copy footprints
+        copied_count = 0
+        failed_count = 0
+        copied_footprints = []
+        
+        for lib_name, fp_name in footprints_to_copy:
+            try:
+                result = self.find_and_copy_footprint(lib_name, fp_name, local_lib_path)
+                if result:
+                    copied_footprints.append(result)
+                    copied_count += 1
+                else:
+                    failed_count += 1
+            except Exception as e:
+                self.log('error', f"✗ Failed to copy {lib_name}:{fp_name}: {str(e)}")
+                failed_count += 1
+        
+        self.log('success', f"Copied {copied_count} footprints to {local_lib_name}{EXTENSION_FOOTPRINT_LIB}")
+        if failed_count > 0:
+            self.log('warning', f"{failed_count} footprints could not be copied")
+        
+        return copied_footprints
+    
+    def localize_3d_models(self, copied_footprints: List[Tuple[str, str, str, str]], 
+                          project_dir: str, models_dir_name: str) -> Tuple[int, int]:
+        """
+        @brief Copy 3D models associated with footprints to local project folder
+        
+        @param copied_footprints: List of (lib_name, fp_name, source_path, dest_path) tuples
+        @param project_dir: Project directory path
+        @param models_dir_name: Name of 3D models directory
+        @return Tuple of (copied_count, failed_count)
+        """
+        if not copied_footprints:
+            self.log('info', "No footprints were copied, skipping 3D model localization")
+            return (0, 0)
+        
+        self.log('info', PROGRESS_STEP_COPY_3D_MODELS + "...")
+        
+        # Create 3D Models folder
+        models_dir = os.path.join(project_dir, models_dir_name)
+        os.makedirs(models_dir, exist_ok=True)
+        self.log('info', f"Using 3D models folder: {models_dir}")
+        
+        copied_models = {}
+        footprints_to_update = []
+        total_models = 0
+        copied_count = 0
+        failed_count = 0
+        
+        # Process each copied footprint
+        for lib_name, fp_name, source_fp_path, dest_fp_path in copied_footprints:
+            self.log('info', f"Checking {fp_name} for 3D models...")
+            
+            # Extract 3D model references
+            try:
+                with open(source_fp_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                sexpr = self.parser.parse(content)
+                model_paths = self.parser.find_3d_models(sexpr)
+            except Exception as e:
+                self.log('warning', f"Could not parse footprint for 3D models: {e}")
+                continue
+            
+            if not model_paths:
+                self.log('info', f"  No 3D models found in {fp_name}")
+                continue
+            
+            self.log('info', f"  Found {len(model_paths)} 3D model(s)")
+            total_models += len(model_paths)
+            
+            old_model_paths = []
+            new_model_paths = []
+            
+            for model_path in model_paths:
+                self.log('info', f"    Model: {model_path}")
+                
+                # Expand environment variables
+                expanded_path = self.lib_manager.expand_path(model_path)
+                model_filename = os.path.basename(expanded_path)
+                
+                if os.path.exists(expanded_path):
+                    # Check if already copied
+                    if model_path in copied_models:
+                        self.log('info', f"      ✓ Already copied: {model_filename}")
+                        old_model_paths.append(model_path)
+                        new_model_paths.append(copied_models[model_path])
+                    else:
+                        # Copy the model file
+                        dest_model_path = os.path.join(models_dir, model_filename)
+                        
+                        try:
+                            shutil.copy2(expanded_path, dest_model_path)
+                            self.log('info', f"      ✓ Copied to {dest_model_path}")
+                            copied_count += 1
+                            
+                            # Store relative path
+                            relative_model_path = f"${{{ENV_VAR_KIPRJMOD}}}/{models_dir_name}/{model_filename}"
+                            copied_models[model_path] = relative_model_path
+                            old_model_paths.append(model_path)
+                            new_model_paths.append(relative_model_path)
+                            
+                        except Exception as e:
+                            self.log('error', f"      ✗ Failed to copy {model_filename}: {str(e)}")
+                            failed_count += 1
+                else:
+                    self.log('warning', f"      ✗ Model file not found: {os.path.normpath(expanded_path)}")
+                    failed_count += 1
+            
+            # Queue footprint for updating
+            if old_model_paths:
+                footprints_to_update.append((dest_fp_path, old_model_paths, new_model_paths))
+        
+        # Update footprint files
+        if footprints_to_update:
+            self.log('info', f"Updating {len(footprints_to_update)} footprint(s) to reference local 3D models...")
+            
+            for dest_fp_path, old_paths, new_paths in footprints_to_update:
+                try:
+                    with open(dest_fp_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Replace old model paths with new local paths
+                    for old_path, new_path in zip(old_paths, new_paths):
+                        content = content.replace(f'"{old_path}"', f'"{new_path}"')
+                    
+                    with open(dest_fp_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    
+                    self.log('info', f"  ✓ Updated {os.path.basename(dest_fp_path)}")
+                    
+                except Exception as e:
+                    self.log('error', f"  ✗ Failed to update {os.path.basename(dest_fp_path)}: {str(e)}")
+        
+        # Summary
+        if total_models > 0:
+            self.log('success', f"3D model localization complete:")
+            self.log('info', f"  • {copied_count} unique models copied to {models_dir_name} folder")
+            self.log('info', f"  • {len(footprints_to_update)} footprints updated with local paths")
+            if failed_count > 0:
+                self.log('warning', f"  • {failed_count} models could not be copied")
+        
+        return (copied_count, failed_count)
+    
+    def copy_single_model(self, model_path: str, expanded_path: str, models_dir: str, 
+                         models_dir_name: str, copied_models: dict) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        @brief Copy a single 3D model file to local project folder
+        
+        @param model_path: Original model path from footprint
+        @param expanded_path: Expanded absolute path to model file
+        @param models_dir: Destination models directory path
+        @param models_dir_name: Name of models directory
+        @param copied_models: Dictionary tracking already copied models
+        @return Tuple of (success, old_path, new_path)
+        """
+        model_filename = os.path.basename(expanded_path)
+        
+        if not os.path.exists(expanded_path):
+            self.log('warning', f"      ✗ Model file not found: {os.path.normpath(expanded_path)}")
+            return False, None, None
+        
+        # Check if already copied
+        if model_path in copied_models:
+            self.log('info', f"      ✓ Already copied: {model_filename}")
+            return True, model_path, copied_models[model_path]
+        
+        # Copy the model file
+        dest_model_path = os.path.join(models_dir, model_filename)
+        
+        try:
+            shutil.copy2(expanded_path, dest_model_path)
+            self.log('info', f"      ✓ Copied to {dest_model_path}")
+            
+            # Store relative path
+            relative_model_path = f"${{{ENV_VAR_KIPRJMOD}}}/{models_dir_name}/{model_filename}"
+            copied_models[model_path] = relative_model_path
+            return True, model_path, relative_model_path
+            
+        except Exception as e:
+            self.log('error', f"      ✗ Failed to copy {model_filename}: {str(e)}")
+            return False, None, None
+    
+    def update_footprint_model_paths(self, footprint_path: str, old_paths: List[str], 
+                                    new_paths: List[str]) -> bool:
+        """
+        @brief Update 3D model paths in a footprint file
+        
+        @param footprint_path: Path to footprint file
+        @param old_paths: List of old model paths to replace
+        @param new_paths: List of new local model paths
+        @return True if successful, False otherwise
+        """
+        try:
+            with open(footprint_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Replace old model paths with new local paths
+            for old_path, new_path in zip(old_paths, new_paths):
+                content = content.replace(f'"{old_path}"', f'"{new_path}"')
+            
+            with open(footprint_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            self.log('info', f"  ✓ Updated {os.path.basename(footprint_path)}")
+            return True
+            
+        except Exception as e:
+            self.log('error', f"  ✗ Failed to update {os.path.basename(footprint_path)}: {str(e)}")
+            return False
+    
+    def extract_3d_models(self, source_fp_path: str, fp_name: str) -> Optional[List[str]]:
+        """
+        @brief Extract 3D model paths from a footprint file
+        
+        @param source_fp_path: Path to source footprint file
+        @param fp_name: Footprint name for logging
+        @return List of model paths, or None if parsing failed
+        """
+        try:
+            with open(source_fp_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            sexpr = self.parser.parse(content)
+            model_paths = self.parser.find_3d_models(sexpr)
+            return model_paths
+        except Exception as e:
+            self.log('warning', f"Could not parse footprint for 3D models: {e}")
+            return None
+    
+    def process_footprint_models(self, fp_name: str, source_fp_path: str, dest_fp_path: str,
+                                   models_dir: str, models_dir_name: str, 
+                                   copied_models: dict) -> Tuple[List[str], List[str], int, int]:
+        """
+        @brief Process all 3D models for a single footprint
+        
+        @param fp_name: Footprint name
+        @param source_fp_path: Source footprint path
+        @param dest_fp_path: Destination footprint path
+        @param models_dir: Models directory path
+        @param models_dir_name: Models directory name
+        @param copied_models: Dictionary tracking copied models
+        @return Tuple of (old_paths, new_paths, copied_count, failed_count)
+        """
+        model_paths = self.extract_3d_models(source_fp_path, fp_name)
+        
+        if model_paths is None:
+            return [], [], 0, 0
+        
+        if not model_paths:
+            self.log('info', f"  No 3D models found in {fp_name}")
+            return [], [], 0, 0
+        
+        self.log('info', f"  Found {len(model_paths)} 3D model(s)")
+        
+        old_model_paths = []
+        new_model_paths = []
+        copied_count = 0
+        failed_count = 0
+        
+        for model_path in model_paths:
+            self.log('info', f"    Model: {model_path}")
+            
+            # Expand environment variables
+            expanded_path = self.lib_manager.expand_path(model_path)
+            
+            success, old_path, new_path = self.copy_single_model(
+                model_path, expanded_path, models_dir, models_dir_name, copied_models
+            )
+            
+            if success and old_path and new_path:
+                old_model_paths.append(old_path)
+                new_model_paths.append(new_path)
+                # Only count as copied if it wasn't already in copied_models before this call
+                if model_path not in copied_models or len(copied_models) == 1:
+                    copied_count += 1
+            elif not success:
+                failed_count += 1
+        
+        return old_model_paths, new_model_paths, copied_count, failed_count
+    
+    def update_footprints_with_local_models(self, footprints_to_update: List[Tuple[str, List[str], List[str]]]) -> None:
+        """
+        @brief Update multiple footprint files with local 3D model paths
+        
+        @param footprints_to_update: List of (dest_fp_path, old_paths, new_paths) tuples
+        """
+        if not footprints_to_update:
+            return
+        
+        self.log('info', f"Updating {len(footprints_to_update)} footprint(s) to reference local 3D models...")
+        
+        for dest_fp_path, old_paths, new_paths in footprints_to_update:
+            self.update_footprint_model_paths(dest_fp_path, old_paths, new_paths)
+    
+    def localize_3d_models(self, copied_footprints: List[Tuple[str, str, str, str]], 
+                          project_dir: str, models_dir_name: str) -> Tuple[int, int]:
+        """
+        @brief Localize 3D models from copied footprints
+        
+        @param copied_footprints: List of (lib_name, fp_name, source_path, dest_path) tuples
+        @param project_dir: Project directory path
+        @param models_dir_name: Name of 3D models directory
+        @return Tuple of (copied_count, failed_count)
+        """
+        if not copied_footprints:
+            self.log('info', "No footprints were copied, skipping 3D model localization")
+            return (0, 0)
+        
+        self.log('info', PROGRESS_STEP_COPY_3D_MODELS + "...")
+        
+        # Create 3D Models folder
+        models_dir = os.path.join(project_dir, models_dir_name)
+        os.makedirs(models_dir, exist_ok=True)
+        self.log('info', f"Using 3D models folder: {models_dir}")
+        
+        copied_models = {}
+        footprints_to_update = []
+        total_models = 0
+        copied_count = 0
+        failed_count = 0
+        
+        # Process each copied footprint
+        for lib_name, fp_name, source_fp_path, dest_fp_path in copied_footprints:
+            self.log('info', f"Checking {fp_name} for 3D models...")
+            
+            old_paths, new_paths, fp_copied, fp_failed = self.process_footprint_models(
+                fp_name, source_fp_path, dest_fp_path, models_dir, models_dir_name, copied_models
+            )
+            
+            if old_paths:
+                footprints_to_update.append((dest_fp_path, old_paths, new_paths))
+                total_models += len(old_paths)
+            
+            copied_count += fp_copied
+            failed_count += fp_failed
+        
+        # Update footprint files
+        self.update_footprints_with_local_models(footprints_to_update)
+        
+        # Summary
+        if total_models > 0:
+            self.log('success', f"3D model localization complete:")
+            self.log('info', f"  • {copied_count} unique models copied to {models_dir_name} folder")
+            self.log('info', f"  • {len(footprints_to_update)} footprints updated with local paths")
+            if failed_count > 0:
+                self.log('warning', f"  • {failed_count} models could not be copied")
+        
+        return (copied_count, failed_count)
+    
+    def update_pcb_references(self, board, copied_footprints: List[Tuple[str, str, str, str]], 
+                             project_path: str, local_lib_name: str, 
+                             create_backup: bool = True) -> int:
+        """
+        @brief Update PCB footprint references to use local library
+        
+        @param board: KiCad BOARD object
+        @param copied_footprints: List of copied footprints
+        @param project_path: Path to PCB file
+        @param local_lib_name: Name of local library
+        @param create_backup: Whether to create backup before modifying
+        @return Number of updated references
+        
+        @throws IOError if backup or save fails
+        """
+        if not copied_footprints:
+            self.log('info', "No footprints to update in PCB")
+            return 0
+        
+        self.log('info', PROGRESS_STEP_UPDATE_PCB + "...")
+        
+        # Create backup
+        if create_backup:
+            try:
+                self.backup_manager.create_backup(project_path)
+            except Exception as e:
+                self.log('error', f"Failed to create PCB backup: {e}")
+                raise
+        
+        # Import pcbnew here to handle development environment
+        try:
+            import pcbnew
+        except ImportError:
+            self.log('error', "pcbnew module not available")
+            raise
+        
+        # Create mapping
+        footprint_map = {}
+        for lib_name, fp_name, _, _ in copied_footprints:
+            footprint_map[(lib_name, fp_name)] = local_lib_name
+        
+        # Update footprints
+        updated_count = 0
+        
+        for fp in board.GetFootprints():
+            try:
+                fpid = fp.GetFPID()
+                fp_name = fpid.GetLibItemName().__str__()
+                lib_name = fpid.GetLibNickname().__str__()
+                
+                if (lib_name, fp_name) in footprint_map:
+                    new_fpid = pcbnew.LIB_ID(local_lib_name, fp_name)
+                    fp.SetFPID(new_fpid)
+                    updated_count += 1
+                    self.log('info', f"  ✓ Updated {lib_name}:{fp_name} → {local_lib_name}:{fp_name}")
+                    
+            except Exception as e:
+                self.log('warning', f"Could not update footprint: {str(e)}")
+        
+        if updated_count > 0:
+            try:
+                board.Save(project_path)
+                self.log('success', f"Updated {updated_count} footprint references in PCB")
+                self.log('info', "PCB saved successfully")
+            except Exception as e:
+                self.log('error', f"Failed to save PCB: {str(e)}")
+                raise
+        else:
+            self.log('info', "No footprint references needed updating")
+        
+        return updated_count
+    
+    def update_schematic_references(self, copied_footprints: List[Tuple[str, str, str, str]], 
+                                   project_dir: str, local_lib_name: str,
+                                   create_backup: bool = True) -> int:
+        """
+        @brief Update schematic footprint references to use local library
+        
+        @param copied_footprints: List of copied footprints
+        @param project_dir: Project directory path
+        @param local_lib_name: Name of local library
+        @param create_backup: Whether to create backups before modifying
+        @return Total number of updated references
+        
+        @throws IOError if backup or save fails
+        """
+        if not copied_footprints:
+            self.log('info', "No footprints to update in schematics")
+            return 0
+        
+        self.log('info', PROGRESS_STEP_UPDATE_SCHEMATICS + "...")
+        
+        # Find schematic files
+        schematic_files = self.find_schematic_files(project_dir)
+        
+        if not schematic_files:
+            self.log('warning', "No schematic files found")
+            return 0
+        
+        total_updated = 0
+        
+        for sch_file in schematic_files:
+            self.log('info', f"Processing {os.path.basename(sch_file)}...")
+            
+            # Build replacement list for this file
+            replacements = []
+            for lib_name, fp_name, _, _ in copied_footprints:
+                old_pattern = f'({SEXPR_PROPERTY} "{SEXPR_FOOTPRINT}" "{lib_name}:{fp_name}"'
+                new_pattern = f'({SEXPR_PROPERTY} "{SEXPR_FOOTPRINT}" "{local_lib_name}:{fp_name}"'
+                replacements.append((old_pattern, new_pattern))
+            
+            try:
+                # Use base class method to update file
+                updated_count = self.update_schematic_file(sch_file, replacements, create_backup)
+                total_updated += updated_count
+                
+            except Exception as e:
+                self.log('error', f"Failed to update {os.path.basename(sch_file)}: {str(e)}")
+                raise
+        
+        if total_updated > 0:
+            self.log('success', f"Updated {total_updated} total footprint reference(s) in schematic files")
+        else:
+            self.log('info', "No footprint references needed updating in schematics")
+        
+        return total_updated
+
+

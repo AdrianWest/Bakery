@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-01-19
+
+### Changed
+- **PCM metadata validation improvements**
+  - Removed invalid tags from metadata.json (symbols, footprints, localization, 3d-models, project-management)
+  - Retained only PCM-compliant tags: "pcbnew" and "library"
+  - Both root and plugins/metadata.json files now use UTF-8 encoding without BOM
+- **Release automation enhancements**
+  - create_release.bat now automatically updates version number in metadata.json
+  - create_release.bat now automatically updates download URL in metadata.json
+  - Removed manual download_url update step from release process
+- Updated PCM_RELEASE_CHECKLIST.md for version 1.0.2
+
+### Fixed
+- UTF-8 BOM issue in metadata.json files causing PCM validation errors
+- Invalid tag schema violations in KiCad Plugin and Content Manager
+
+## [1.0.1] - 2026-01-18
+
 ### Added
 - **Automated release package builder (create_release.bat)**
   - Command-line parameter for version specification
@@ -172,4 +191,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[1.0.0]: https://github.com/bakery-kicad/Bakery/releases/tag/v1.0.0
+[1.0.2]: https://github.com/AdrianWest/Bakery/releases/tag/v1.0.2
+[1.0.1]: https://github.com/AdrianWest/Bakery/releases/tag/v1.0.1
+[1.0.0]: https://github.com/AdrianWest/Bakery/releases/tag/v1.0.0

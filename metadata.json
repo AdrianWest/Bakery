@@ -1,4 +1,4 @@
-﻿{
+{
     "$schema":  "https://go.kicad.org/pcm/schemas/v1",
     "name":  "Bakery",
     "description":  "Localize KiCad symbols, footprints, and 3D models to project libraries",
@@ -18,26 +18,21 @@
                   },
     "tags":  [
                  "pcbnew",
-                 "library",
-                 "symbols",
-                 "footprints",
-                 "localization",
-                 "3d-models",
-                 "project-management"
+                 "library"
              ],
     "keep_on_update":  [
 
                        ],
     "versions":  [
                      {
-                         "version":  "1.0.0",
+                         "version":  "1.0.1",
                          "status":  "stable",
                          "kicad_version":  "9.0",
                          "kicad_version_max":  "9.99",
-                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v1.0.0/Bakery-1.0.0.zip",
-                         "download_sha256":  "6130c7f3207403b7273ebdd186f673883650280fbd663cbf4cea14219dc92933",
-                         "download_size":  65731,
-                         "install_size":  204992
+                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v1.0.1/Bakery-1.0.1.zip",
+                         "download_sha256":  "PLACEHOLDER",
+                         "download_size":  0,
+                         "install_size":  0
                      }
                  ]
 }

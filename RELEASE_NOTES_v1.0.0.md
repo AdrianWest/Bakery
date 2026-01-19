@@ -1,4 +1,4 @@
-# Bakery v1.0.0 - Initial Release
+# Bakery v1.0.1 - Initial Release
 
 ## Overview
 
@@ -51,7 +51,7 @@ install.bat
 
 ## System Requirements
 
-- KiCad 8.0 or later
+- KiCad 9.0 or later
 - Python 3.8+ (bundled with KiCad)
 - Windows, Linux, or macOS
 

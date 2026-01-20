@@ -49,9 +49,7 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   │   └── resources/
   │       ├── Bakery_Icon.png
   │       └── Bakery_Icon_256x256.png
-  ├── LICENSE
-  ├── metadata.json (copy at root)
-  └── README.md (optional but recommended)
+  └── metadata.json (copy at root)
   ```
 
 - [ ] **Create ZIP package**

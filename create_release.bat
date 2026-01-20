@@ -80,8 +80,8 @@ if exist "resources\Bakery_Icon_256x256.png" (
     echo WARNING: resources\Bakery_Icon_256x256.png not found!
 )
 
-echo Copying root files...
-copy "metadata.json" "%RELEASE_DIR%\" > nul
+echo Copying root metadata.json (copy from plugins)...
+copy "plugins\metadata.json" "%RELEASE_DIR%\metadata.json" > nul
 
 echo.
 echo Removing download fields from plugins/metadata.json (cannot be in package)...

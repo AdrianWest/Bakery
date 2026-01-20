@@ -39,7 +39,11 @@ copy /Y "%~dp0plugins\backup_manager.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0plugins\constants.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0plugins\utils.py" "%KICAD_PLUGINS_DIR%\"
 copy /Y "%~dp0plugins\metadata.json" "%KICAD_PLUGINS_DIR%\"
-xcopy /Y /I "%~dp0resources" "%KICAD_PLUGINS_DIR%\resources\"
+
+REM Copy resources folder
+mkdir "%KICAD_PLUGINS_DIR%\resources"
+xcopy /Y /I "%~dp0plugins\resources\*" "%KICAD_PLUGINS_DIR%\resources\"
+
 copy /Y "%~dp0LICENSE" "%KICAD_PLUGINS_DIR%\"
 
 REM Check if installation was successful

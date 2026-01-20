@@ -1,4 +1,44 @@
-# Bakery v1.0.1 - Initial Release
+# Bakery - Release Notes
+
+## v1.0.2 - PCM Compliance Update (January 19, 2026)
+
+### Overview
+This maintenance release addresses KiCad Plugin and Content Manager (PCM) metadata validation issues, improves the release automation process, and reorganizes project structure. No functional changes to the plugin itself.
+
+### What's New in v1.0.2
+
+#### PCM Metadata Fixes
+- **Removed invalid tags** - Cleaned up metadata.json to include only PCM-compliant tags ("pcbnew" and "library")
+- **Fixed UTF-8 encoding** - Removed BOM (Byte Order Mark) from metadata.json files that was causing validation errors
+- **Schema compliance** - Ensured full compliance with KiCad PCM v1 schema
+- **Automatic BOM cleanup** - create_release.bat now automatically removes BOM from metadata files after updates
+
+#### Project Structure Improvements
+- **Reorganized resources** - Moved resources folder inside plugins directory for better organization
+- **Updated icon path** - Plugin now uses high-resolution 256x256 icon from plugins/resources/
+- **Consistent file structure** - Aligns with KiCad plugin best practices
+
+#### Release Automation Enhancements
+- **Dual metadata updates** - create_release.bat now updates both root and plugins/metadata.json files
+- **Automatic version updates** - Both metadata files get version number synchronized
+- **Automatic URL generation** - Download URL is now generated automatically during release process
+- **Automatic BOM removal** - UTF-8 BOM cleanup runs after all metadata updates
+- **Streamlined workflow** - Reduced manual steps in release checklist
+
+#### Documentation Updates
+- **Merged release notes** - Consolidated versioned release notes into single RELEASE_NOTES.md
+- **Updated PCM checklist** - Reflects new automation features
+- **Updated CHANGELOG** - Complete history of all changes
+
+### Installation
+Install via KiCad Plugin and Content Manager or use the install.bat script.
+
+### Upgrading from v1.0.1
+Simply install v1.0.2 through the Plugin and Content Manager, or run the install script. All settings and functionality remain the same.
+
+---
+
+## v1.0.1 - Initial Release (January 18, 2026)
 
 ## Overview
 

@@ -50,7 +50,7 @@ echo.
 echo Creating release directory structure...
 mkdir "%RELEASE_DIR%"
 mkdir "%RELEASE_DIR%\plugins"
-mkdir "%RELEASE_DIR%\resources"
+mkdir "%RELEASE_DIR%\plugins\resources"
 
 echo.
 echo Copying plugin files...
@@ -69,13 +69,13 @@ copy "plugins\metadata.json" "%RELEASE_DIR%\plugins\" > nul
 
 echo Copying resource files...
 if exist "resources\Bakery_Icon.png" (
-    copy "resources\Bakery_Icon.png" "%RELEASE_DIR%\resources\" > nul
+    copy "resources\Bakery_Icon.png" "%RELEASE_DIR%\plugins\resources\" > nul
 ) else (
     echo WARNING: resources\Bakery_Icon.png not found!
 )
 
 if exist "resources\Bakery_Icon_256x256.png" (
-    copy "resources\Bakery_Icon_256x256.png" "%RELEASE_DIR%\resources\" > nul
+    copy "resources\Bakery_Icon_256x256.png" "%RELEASE_DIR%\plugins\resources\" > nul
 ) else (
     echo WARNING: resources\Bakery_Icon_256x256.png not found!
 )
@@ -84,6 +84,11 @@ echo Copying root files...
 copy "LICENSE" "%RELEASE_DIR%\" > nul
 copy "metadata.json" "%RELEASE_DIR%\" > nul
 copy "README.md" "%RELEASE_DIR%\" > nul
+
+echo.
+echo Removing UTF-8 BOM from metadata.json files...
+powershell -NoProfile -Command "$content = Get-Content '%RELEASE_DIR%\metadata.json' -Raw; [System.IO.File]::WriteAllText('%RELEASE_DIR%\metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
+powershell -NoProfile -Command "$content = Get-Content '%RELEASE_DIR%\plugins\metadata.json' -Raw; [System.IO.File]::WriteAllText('%RELEASE_DIR%\plugins\metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
 
 echo.
 echo Creating ZIP archive...
@@ -127,11 +132,11 @@ echo SHA256 hash: %SHA256%
 
 echo.
 echo ============================================================================
-echo Updating metadata.json...
+echo Updating metadata.json files...
 echo ============================================================================
 echo.
 
-REM Create a temporary PowerShell script to update metadata.json
+REM Create a temporary PowerShell script to update root metadata.json
 echo $json = Get-Content 'metadata.json' -Raw ^| ConvertFrom-Json > update_metadata.ps1
 echo $json.versions[0].version = '%VERSION%' >> update_metadata.ps1
 echo $json.versions[0].download_url = 'https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%' >> update_metadata.ps1
@@ -140,17 +145,33 @@ echo $json.versions[0].download_size = [int]%ZIP_SIZE% >> update_metadata.ps1
 echo $json.versions[0].install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
 echo $json.versions[0].status = 'stable' >> update_metadata.ps1
 echo $json ^| ConvertTo-Json -Depth 10 ^| Set-Content 'metadata.json' -Encoding UTF8 >> update_metadata.ps1
+echo. >> update_metadata.ps1
+echo # Update plugins/metadata.json with same values >> update_metadata.ps1
+echo $json = Get-Content 'plugins\metadata.json' -Raw ^| ConvertFrom-Json >> update_metadata.ps1
+echo $json.versions[0].version = '%VERSION%' >> update_metadata.ps1
+echo $json.versions[0].download_url = 'https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%' >> update_metadata.ps1
+echo $json.versions[0].download_sha256 = '%SHA256%' >> update_metadata.ps1
+echo $json.versions[0].download_size = [int]%ZIP_SIZE% >> update_metadata.ps1
+echo $json.versions[0].install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
+echo $json.versions[0].status = 'stable' >> update_metadata.ps1
+echo $json ^| ConvertTo-Json -Depth 10 ^| Set-Content 'plugins\metadata.json' -Encoding UTF8 >> update_metadata.ps1
 
 REM Execute the PowerShell script
 powershell -NoProfile -ExecutionPolicy Bypass -File update_metadata.ps1
 
 if %ERRORLEVEL% EQU 0 (
-    echo metadata.json updated successfully!
+    echo Root and plugins metadata.json updated successfully!
     del update_metadata.ps1
 ) else (
     echo WARNING: Failed to update metadata.json
     if exist update_metadata.ps1 del update_metadata.ps1
 )
+
+echo.
+echo Removing UTF-8 BOM from repository metadata.json files...
+powershell -NoProfile -Command "$content = Get-Content 'metadata.json' -Raw; [System.IO.File]::WriteAllText('metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
+powershell -NoProfile -Command "$content = Get-Content 'plugins\metadata.json' -Raw; [System.IO.File]::WriteAllText('plugins\metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
+echo Repository metadata.json files cleaned successfully!
 
 echo   - download_sha256: %SHA256%
 echo   - download_size: %ZIP_SIZE%

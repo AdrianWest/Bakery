@@ -109,7 +109,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.category = PLUGIN_CATEGORY
         self.description = PLUGIN_DESCRIPTION
         self.show_toolbar_button = True
-        self.icon_file_name = os.path.join(os.path.dirname(__file__), "resources", "Bakery_Icon_256x256.png")
+        self.icon_file_name = os.path.join(os.path.dirname(__file__), "resources", "Bakery_Icon.png")
     
     def Run(self):
         """

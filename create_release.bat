@@ -81,11 +81,12 @@ if exist "resources\Bakery_Icon_256x256.png" (
 )
 
 echo Copying root files...
-copy "LICENSE" "%RELEASE_DIR%\" > nul
 copy "metadata.json" "%RELEASE_DIR%\" > nul
-copy "README.md" "%RELEASE_DIR%\" > nul
 
 echo.
+echo Removing download fields from plugins/metadata.json (cannot be in package)...
+powershell -NoProfile -Command "$json = Get-Content '%RELEASE_DIR%\plugins\metadata.json' -Raw | ConvertFrom-Json; $json.versions[0].PSObject.Properties.Remove('download_sha256'); $json.versions[0].PSObject.Properties.Remove('download_size'); $json.versions[0].PSObject.Properties.Remove('install_size'); $json.versions[0].PSObject.Properties.Remove('download_url'); $json | ConvertTo-Json -Depth 10 | Set-Content '%RELEASE_DIR%\plugins\metadata.json' -Encoding UTF8"
+
 echo Removing UTF-8 BOM from metadata.json files...
 powershell -NoProfile -Command "$content = Get-Content '%RELEASE_DIR%\metadata.json' -Raw; [System.IO.File]::WriteAllText('%RELEASE_DIR%\metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
 powershell -NoProfile -Command "$content = Get-Content '%RELEASE_DIR%\plugins\metadata.json' -Raw; [System.IO.File]::WriteAllText('%RELEASE_DIR%\plugins\metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
@@ -146,13 +147,9 @@ echo $json.versions[0].install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
 echo $json.versions[0].status = 'stable' >> update_metadata.ps1
 echo $json ^| ConvertTo-Json -Depth 10 ^| Set-Content 'metadata.json' -Encoding UTF8 >> update_metadata.ps1
 echo. >> update_metadata.ps1
-echo # Update plugins/metadata.json with same values >> update_metadata.ps1
+echo # Update plugins/metadata.json with version and status only (no download fields) >> update_metadata.ps1
 echo $json = Get-Content 'plugins\metadata.json' -Raw ^| ConvertFrom-Json >> update_metadata.ps1
 echo $json.versions[0].version = '%VERSION%' >> update_metadata.ps1
-echo $json.versions[0].download_url = 'https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%' >> update_metadata.ps1
-echo $json.versions[0].download_sha256 = '%SHA256%' >> update_metadata.ps1
-echo $json.versions[0].download_size = [int]%ZIP_SIZE% >> update_metadata.ps1
-echo $json.versions[0].install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
 echo $json.versions[0].status = 'stable' >> update_metadata.ps1
 echo $json ^| ConvertTo-Json -Depth 10 ^| Set-Content 'plugins\metadata.json' -Encoding UTF8 >> update_metadata.ps1
 

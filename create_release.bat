@@ -68,16 +68,11 @@ copy "plugins\utils.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\metadata.json" "%RELEASE_DIR%\plugins\" > nul
 
 echo Copying resource files...
-if exist "resources\Bakery_Icon.png" (
-    copy "resources\Bakery_Icon.png" "%RELEASE_DIR%\plugins\resources\" > nul
+if exist "plugins\resources\Bakery_Icon.png" (
+    copy "plugins\resources\Bakery_Icon.png" "%RELEASE_DIR%\plugins\resources\" > nul
+    echo   - Bakery_Icon.png copied
 ) else (
-    echo WARNING: resources\Bakery_Icon.png not found!
-)
-
-if exist "resources\Bakery_Icon_256x256.png" (
-    copy "resources\Bakery_Icon_256x256.png" "%RELEASE_DIR%\plugins\resources\" > nul
-) else (
-    echo WARNING: resources\Bakery_Icon_256x256.png not found!
+    echo WARNING: plugins\resources\Bakery_Icon.png not found!
 )
 
 echo Copying root metadata.json (copy from plugins)...

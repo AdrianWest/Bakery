@@ -42,6 +42,7 @@ datasheets are stored in symbol definitions, not footprints.
 - Scans symbol libraries for datasheet properties
 - Handles both URL downloads (http://, https://) and local file copying
 - Only processes PDF format datasheets (.pdf extension) - non-PDF files are skipped
+- Compares file modification dates when destination file exists - keeps the latest version
 - Updates paths to use ${KIPRJMOD} variable for portability
 - Creates organized datasheet directory structure
 - Automatically deduplicates references to avoid copying same datasheet multiple times
@@ -181,15 +182,18 @@ class DataSheetLocalizer(BaseLocalizer):
         #       * Verify URL ends with .pdf
         #       * Download PDF from internet to local directory
         #       * Extract filename from URL or generate from component name
+        #       * If destination file exists, compare dates and keep the latest version
         #       * Save to ${KIPRJMOD}/Data_Sheets/
         #   - If local file path: 
         #       * Verify file has .pdf extension
         #       * Expand KiCad path variables (${KIPRJMOD}, etc.)
-        #       * Copy file to local directory
+        #       * If destination file exists, compare modification dates and keep the latest
+        #       * Copy file to local directory only if source is newer or file doesn't exist
         #       * Preserve original filename
         #   - Track successful copies/downloads
         #   - Build mapping of old refs to new local paths for update step
         #   - Log skipped non-PDF datasheets
+        #   - Log when existing files are preserved due to being newer
         
         return copied_count
     
@@ -203,6 +207,8 @@ class DataSheetLocalizer(BaseLocalizer):
         
         Only processes URLs ending with .pdf extension - non-PDF URLs are skipped.
         
+        If destination file already exists, compares dates and keeps the latest version.
+        
         @param url: Internet URL to download from (e.g., "http://www.vishay.com/docs/88503/1n4001.pdf")
         @param dest_path: Destination file path in local project
         
@@ -214,10 +220,14 @@ class DataSheetLocalizer(BaseLocalizer):
         
         # TODO: Implement URL download logic
         # Verify URL ends with .pdf (case-insensitive) before downloading
+        # Check if dest_path already exists
+        # If exists, get HTTP Last-Modified header from URL and compare with local file date
+        # Only download if remote file is newer or local file doesn't exist
         # Use urllib.request or requests library to download file
         # Handle HTTP errors gracefully (404, timeouts, etc.)
         # Verify file was downloaded successfully
         # Check if downloaded file is a valid PDF (magic bytes)
+        # Log when existing file is preserved due to being newer
         
         return False
     

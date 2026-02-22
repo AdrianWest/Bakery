@@ -308,21 +308,55 @@ class DataSheetLocalizer(BaseLocalizer):
         
         @return True if update successful, False otherwise
         """
-        self.log("info", f"Updating datasheet references in: {symbol_lib_path}")
+        self.log("info", f"Updating datasheet references in symbol library: {symbol_lib_path}")
         
-        # TODO: Implement symbol library update logic
-        # Log: Starting reference update process
+        if not datasheet_map:
+            self.log("info", "No datasheet mappings to apply")
+            return True
+        
         # Read symbol library content
-        # Log: Number of symbols in library
-        # Replace old datasheet references with ${KIPRJMOD}/Datasheets/... paths
-        # Log: Each reference being updated (old path -> new path)
-        # Create backup before modifying
-        # Log: Backup creation status
-        # Write updated content back to file
-        # Log: File write success
-        # Log: Total number of references updated
+        content = safe_read_file(symbol_lib_path)
+        if not content:
+            self.log("error", f"Failed to read symbol library: {symbol_lib_path}")
+            return False
         
-        return False
+        self.log("info", "Starting reference update process")
+        
+        original_content = content
+        updates_made = 0
+        
+        # Replace old datasheet references with ${KIPRJMOD}/Data_Sheets/... paths
+        for old_ref, new_ref in datasheet_map.items():
+            if old_ref in content:
+                # Count occurrences before replacement
+                occurrences = content.count(old_ref)
+                content = content.replace(old_ref, new_ref)
+                updates_made += occurrences
+                self.log("info", f"Updated {occurrences} reference(s): {old_ref} -> {new_ref}")
+        
+        # Only write if changes were made
+        if content == original_content:
+            self.log("info", "No datasheet references needed updating")
+            return True
+        
+        # Create backup before modifying
+        self.log("info", "Creating backup before modifying symbol library")
+        if not self.backup_manager.create_backup(symbol_lib_path):
+            self.log("warning", f"Failed to create backup for: {symbol_lib_path}")
+            # Continue anyway as this is not critical
+        else:
+            self.log("info", "Backup created successfully")
+        
+        # Write updated content back to file
+        try:
+            with open(symbol_lib_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            self.log("success", f"Symbol library updated successfully: {symbol_lib_path}")
+            self.log("info", f"Total references updated: {updates_made}")
+            return True
+        except Exception as e:
+            self.log("error", f"Failed to write updated symbol library: {str(e)}")
+            return False
     
     def localize_all_datasheets(
         self,

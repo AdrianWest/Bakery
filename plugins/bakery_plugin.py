@@ -45,8 +45,9 @@ from .constants import (
     PLUGIN_NAME, PLUGIN_CATEGORY, PLUGIN_DESCRIPTION,
     ERROR_NO_BOARD, ERROR_PROJECT_NOT_SAVED, CONFIRM_LOCALIZATION,
     CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME, CONFIG_SYMBOL_DIR_NAME,
-    CONFIG_MODELS_DIR_NAME, CONFIG_CREATE_BACKUPS, DEFAULT_LOCAL_LIB_NAME,
-    DEFAULT_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME,
+    CONFIG_MODELS_DIR_NAME, CONFIG_CREATE_BACKUPS, CONFIG_DATASHEETS_DIR_NAME,
+    DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_DIR_NAME,
+    DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
     PROGRESS_STEP_SCAN_PCB, PROGRESS_STEP_SCAN_SCHEMATICS, PROGRESS_STEP_SCAN_SYMBOLS,
     PROGRESS_STEP_COPY_FOOTPRINTS, PROGRESS_STEP_COPY_SYMBOLS, PROGRESS_STEP_COPY_3D_MODELS,
     PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS,
@@ -60,6 +61,7 @@ from .constants import (
 from .ui_components import BakeryLogger, ConfigDialog
 from .footprint_localizer import FootprintLocalizer
 from .symbol_localizer import SymbolLocalizer
+from .data_sheet_localizer import DatasheetLocalizer
 from .library_manager import LibraryManager
 
 
@@ -207,6 +209,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.logger.info(f"Configuration: Library={self.config[CONFIG_LOCAL_LIB_NAME]}, "
                         f"Symbols={self.config[CONFIG_SYMBOL_LIB_NAME]}, "
                         f"Models={self.config[CONFIG_MODELS_DIR_NAME]}, "
+                        f"Datasheets={self.config[CONFIG_DATASHEETS_DIR_NAME]}, "
                         f"Backups={self.config[CONFIG_CREATE_BACKUPS]}")
         
         # Check if schematic files are locked before starting
@@ -337,12 +340,51 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         else:
             self.logger.info("No symbols found in schematics")
         
+        # === DATASHEET LOCALIZATION ===
+        
+        # Step 11: Localize datasheets
+        datasheets_processed = 0
+        datasheets_files_updated = 0
+        if copied_symbols:
+            self.logger.info("Starting datasheet localization...")
+            datasheet_localizer = DatasheetLocalizer(
+                self.logger,
+                project_dir,
+                self.config[CONFIG_DATASHEETS_DIR_NAME]
+            )
+            
+            # Get symbol library paths
+            symbol_lib_path = os.path.join(
+                project_dir,
+                self.config[CONFIG_SYMBOL_DIR_NAME],
+                f"{self.config[CONFIG_SYMBOL_LIB_NAME]}.kicad_sym"
+            )
+            symbol_libs = [symbol_lib_path] if os.path.exists(symbol_lib_path) else []
+            
+            # Get schematic files
+            import glob
+            from .constants import EXTENSION_SCHEMATIC
+            schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
+            
+            # Localize datasheets
+            datasheets_processed, datasheets_files_updated = datasheet_localizer.localize_all_datasheets(
+                symbol_libs,
+                schematic_files
+            )
+            
+            self.logger.info(f"Datasheet localization complete: {datasheets_processed} datasheets processed, "
+                           f"{datasheets_files_updated} files updated")
+        else:
+            self.logger.info("No symbols copied, skipping datasheet localization")
+        
         # Complete
         self.logger.set_progress(PROGRESS_COMPLETE, PROGRESS_BAR_RANGE, "Complete")
         self.logger.success(SUCCESS_LOCALIZATION_COMPLETE)
         
         if copied_footprints or copied_symbols:
             self.logger.info(f"Copied {len(copied_footprints)} footprints and {len(copied_symbols)} symbols to local libraries.")
+            if datasheets_processed > 0:
+                self.logger.info(f"Processed {datasheets_processed} datasheets.")
             self.logger.info(f"All references have been updated to use local libraries.")
         else:
             self.logger.info("All footprints and symbols were already in local libraries.")
@@ -363,12 +405,20 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.logger.set_progress(PROGRESS_INITIAL, PROGRESS_BAR_RANGE, "")
         
         # Show completion dialog
-        wx.MessageBox(
+        completion_msg = (
             f"Localization Complete!\n\n"
             f"• {len(copied_footprints)} footprints copied\n"
             f"• {len(copied_symbols)} symbols copied\n"
+        )
+        if datasheets_processed > 0:
+            completion_msg += f"• {datasheets_processed} datasheets processed\n"
+        completion_msg += (
             f"• {len(all_backups)} backup(s) created\n\n"
-            f"All references have been updated to use local libraries.",
+            f"All references have been updated to use local libraries."
+        )
+        
+        wx.MessageBox(
+            completion_msg,
             "Bakery - Success",
             wx.OK | wx.ICON_INFORMATION
         )

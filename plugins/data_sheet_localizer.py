@@ -21,25 +21,30 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 @brief Datasheet localization for Bakery plugin
 
 Handles localization of component datasheets:
-- Scanning symbols for datasheet references
-- Copying datasheets to local project directory
+- Scanning symbols for datasheet references (URLs or local file paths)
+- Downloading datasheets from internet URLs (http://, https://)
+- Copying local datasheet files to project directory
 - Updating datasheet references to point to local copies
 - Preserving original datasheet file structure
 
 @section description_datasheet_localizer Detailed Description
 This module provides the DataSheetLocalizer class which manages datasheet
 localization. It scans symbol libraries (.kicad_sym) to find datasheet 
-properties (URLs or file paths), downloads or copies the datasheets to a 
-local project directory, and updates all references to use local paths 
-with ${KIPRJMOD} variable. In KiCad, datasheets are stored in symbol 
-definitions, not footprints.
+properties which can be either:
+- Internet URLs (e.g., "http://www.vishay.com/docs/88503/1n4001.pdf") - downloaded
+- Local file paths (e.g., "C:\\Datasheets\\file.pdf") - copied
+
+Downloads or copies the datasheets to a local project directory, and updates 
+all references to use local paths with ${KIPRJMOD} variable. In KiCad, 
+datasheets are stored in symbol definitions, not footprints.
 
 @section notes_datasheet_localizer Notes
 - Scans symbol libraries for datasheet properties
-- Supports both URL downloads and local file copying
+- Handles both URL downloads (http://, https://) and local file copying
 - Preserves datasheet file formats (PDF, etc.)
 - Updates paths to use ${KIPRJMOD} variable for portability
 - Creates organized datasheet directory structure
+- Automatically deduplicates references to avoid copying same datasheet multiple times
 """
 
 import os
@@ -137,10 +142,13 @@ class DataSheetLocalizer(BaseLocalizer):
         """
         @brief Copy or download datasheets to local project directory
         
-        Creates datasheet directory if needed, then copies local files or
-        downloads from URLs. Automatically deduplicates URLs to avoid copying
-        the same datasheet multiple times (e.g., when multiple component 
-        instances reference the same datasheet URL).
+        Creates datasheet directory if needed, then:
+        - Downloads PDF files from internet URLs (http://, https://)
+        - Copies local file paths to the project directory
+        
+        Automatically deduplicates URLs to avoid copying the same datasheet 
+        multiple times (e.g., when multiple component instances reference 
+        the same datasheet URL).
         
         @param datasheets: List of (component_name, datasheet_ref) tuples
         @param progress_callback: Optional callback for progress updates
@@ -166,20 +174,30 @@ class DataSheetLocalizer(BaseLocalizer):
         
         # TODO: Implement datasheet copying logic
         # For each unique datasheet reference:
-        #   - Determine if it's a URL or file path
-        #   - If URL: download to local directory
-        #   - If local path: copy to local directory
-        #   - Generate local filename based on URL/filename
-        #   - Track successful copies
+        #   - Determine if it's a URL (starts with http:// or https://) or local file path
+        #   - If URL: 
+        #       * Download PDF from internet to local directory
+        #       * Extract filename from URL or generate from component name
+        #       * Save to ${KIPRJMOD}/Data_Sheets/
+        #   - If local file path: 
+        #       * Expand KiCad path variables (${KIPRJMOD}, etc.)
+        #       * Copy file to local directory
+        #       * Preserve original filename
+        #   - Track successful copies/downloads
+        #   - Build mapping of old refs to new local paths for update step
         
         return copied_count
     
     def download_datasheet(self, url: str, dest_path: str) -> bool:
         """
-        @brief Download a datasheet from a URL
+        @brief Download a datasheet PDF from a URL
         
-        @param url: URL to download from
-        @param dest_path: Destination file path
+        Downloads PDF files from internet URLs (http://, https://) to the
+        local project directory. This handles web-hosted datasheets that
+        need to be downloaded for offline project portability.
+        
+        @param url: Internet URL to download from (e.g., "http://www.vishay.com/docs/88503/1n4001.pdf")
+        @param dest_path: Destination file path in local project
         
         @return True if download successful, False otherwise
         
@@ -188,9 +206,10 @@ class DataSheetLocalizer(BaseLocalizer):
         self.log("info", f"Downloading datasheet from: {url}")
         
         # TODO: Implement URL download logic
-        # Use urllib or requests to download file
-        # Handle errors gracefully
+        # Use urllib.request or requests library to download file
+        # Handle HTTP errors gracefully (404, timeouts, etc.)
         # Verify file was downloaded successfully
+        # Check if downloaded file is a valid PDF
         
         return False
     

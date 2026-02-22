@@ -21,20 +21,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 @brief Datasheet localization for Bakery plugin
 
 Handles localization of component datasheets:
-- Scanning symbols and footprints for datasheet references
+- Scanning symbols for datasheet references
 - Copying datasheets to local project directory
 - Updating datasheet references to point to local copies
 - Preserving original datasheet file structure
 
 @section description_datasheet_localizer Detailed Description
 This module provides the DataSheetLocalizer class which manages datasheet
-localization. It scans symbol libraries (.kicad_sym) and footprint files
-(.kicad_mod) to find datasheet properties (URLs or file paths), downloads
-or copies the datasheets to a local project directory, and updates all
-references to use local paths with ${KIPRJMOD} variable.
+localization. It scans symbol libraries (.kicad_sym) to find datasheet 
+properties (URLs or file paths), downloads or copies the datasheets to a 
+local project directory, and updates all references to use local paths 
+with ${KIPRJMOD} variable. In KiCad, datasheets are stored in symbol 
+definitions, not footprints.
 
 @section notes_datasheet_localizer Notes
-- Scans both symbol and footprint files for datasheet properties
+- Scans symbol libraries for datasheet properties
 - Supports both URL downloads and local file copying
 - Preserves datasheet file formats (PDF, etc.)
 - Updates paths to use ${KIPRJMOD} variable for portability
@@ -58,19 +59,19 @@ class DataSheetLocalizer(BaseLocalizer):
     """!
     @brief Handles localization of component datasheets from URLs and global locations
     
-    Scans symbol and footprint files, identifies datasheet references (URLs or paths),
-    downloads or copies them to project-local directory, and updates all references.
+    Scans symbol libraries for datasheet references (URLs or paths), downloads or 
+    copies them to project-local directory, and updates all references. In KiCad,
+    datasheets are stored in symbol definitions.
     
     Inherits common functionality from BaseLocalizer.
     
     @section methods Methods
     - :py:meth:`~DataSheetLocalizer.__init__`
     - :py:meth:`~DataSheetLocalizer.scan_symbol_datasheets`
-    - :py:meth:`~DataSheetLocalizer.scan_footprint_datasheets`
     - :py:meth:`~DataSheetLocalizer.copy_datasheets`
     - :py:meth:`~DataSheetLocalizer.download_datasheet`
     - :py:meth:`~DataSheetLocalizer.update_symbol_references`
-    - :py:meth:`~DataSheetLocalizer.update_footprint_references`
+    - :py:meth:`~DataSheetLocalizer.localize_all_datasheets`
     
     @section attributes Attributes
     - project_dir (str): Project directory path
@@ -101,7 +102,8 @@ class DataSheetLocalizer(BaseLocalizer):
         @brief Scan a symbol library file for datasheet references
         
         Parses symbol library and extracts all datasheet property values.
-        Returns list of (symbol_name, datasheet_ref) tuples.
+        Returns list of (symbol_name, datasheet_ref) tuples. Datasheets
+        in KiCad are stored in symbol definitions.
         
         @param symbol_lib_path: Path to .kicad_sym file
         
@@ -111,30 +113,13 @@ class DataSheetLocalizer(BaseLocalizer):
         datasheets = []
         
         # TODO: Implement symbol library parsing for datasheet properties
-        # Parse .kicad_sym file
-        # Find (property "Datasheet" "value") entries
+        # Parse .kicad_sym file using S-expression parser
+        # Find (symbol ...) entries
+        # Within each symbol, find (property "Datasheet" "value") entries
         # Extract symbol names and datasheet values
+        # Filter out empty datasheets ("" or "~")
         
         return datasheets
-    
-    def scan_footprint_datasheets(self, footprint_path: str) -> Optional[str]:
-        """
-        @brief Scan a footprint file for datasheet reference
-        
-        Parses footprint file and extracts datasheet property value if present.
-        
-        @param footprint_path: Path to .kicad_mod file
-        
-        @return Datasheet reference string or None
-        """
-        self.log("info", f"Scanning footprint for datasheet: {footprint_path}")
-        
-        # TODO: Implement footprint parsing for datasheet property
-        # Parse .kicad_mod file
-        # Find (property "Datasheet" "value") entry
-        # Extract datasheet value
-        
-        return None
     
     def copy_datasheets(
         self,
@@ -214,43 +199,19 @@ class DataSheetLocalizer(BaseLocalizer):
         
         return False
     
-    def update_footprint_references(
-        self,
-        footprint_path: str,
-        datasheet_map: dict
-    ) -> bool:
-        """
-        @brief Update datasheet reference in footprint to point to local copy
-        
-        @param footprint_path: Path to .kicad_mod file
-        @param datasheet_map: Dictionary mapping old refs to new local paths
-        
-        @return True if update successful, False otherwise
-        """
-        self.log("info", f"Updating datasheet reference in: {footprint_path}")
-        
-        # TODO: Implement footprint update logic
-        # Read footprint content
-        # Replace old datasheet reference with ${KIPRJMOD}/Datasheets/... path
-        # Create backup before modifying
-        # Write updated content back to file
-        
-        return False
-    
     def localize_all_datasheets(
         self,
         symbol_libs: List[str],
-        footprint_libs: List[str],
         progress_callback: Optional[Callable] = None
     ) -> Tuple[int, int]:
         """
         @brief Main entry point to localize all datasheets in the project
         
-        Scans all symbol and footprint libraries, copies/downloads datasheets,
-        and updates all references.
+        Scans all symbol libraries for datasheet references, copies/downloads 
+        datasheets, and updates all references. In KiCad, datasheets are stored
+        in symbol definitions.
         
         @param symbol_libs: List of symbol library paths to scan
-        @param footprint_libs: List of footprint library directories to scan
         @param progress_callback: Optional callback for progress updates
         
         @return Tuple of (datasheets_copied, references_updated)
@@ -259,26 +220,18 @@ class DataSheetLocalizer(BaseLocalizer):
         
         all_datasheets = []
         
-        # Scan symbol libraries
+        # Scan symbol libraries for datasheets
         for symbol_lib in symbol_libs:
             if os.path.exists(symbol_lib):
                 datasheets = self.scan_symbol_datasheets(symbol_lib)
                 all_datasheets.extend(datasheets)
         
-        # Scan footprint libraries
-        for footprint_lib in footprint_libs:
-            if os.path.exists(footprint_lib) and os.path.isdir(footprint_lib):
-                for footprint_file in os.listdir(footprint_lib):
-                    if footprint_file.endswith(EXTENSION_FOOTPRINT):
-                        footprint_path = os.path.join(footprint_lib, footprint_file)
-                        datasheet = self.scan_footprint_datasheets(footprint_path)
-                        if datasheet:
-                            all_datasheets.append((footprint_file, datasheet))
+        self.log("info", f"Found {len(all_datasheets)} datasheet references in symbols")
         
         # Copy/download datasheets
         copied_count = self.copy_datasheets(all_datasheets, progress_callback)
         
-        # TODO: Update all references in symbol and footprint files
+        # TODO: Update all references in symbol library files
         updated_count = 0
         
         self.log("success", f"Datasheet localization complete: {copied_count} copied, {updated_count} references updated")

@@ -82,14 +82,14 @@ class DataSheetLocalizer(BaseLocalizer):
     def __init__(
         self,
         project_dir: str,
-        datasheet_dir: str = "Datasheets",
+        datasheet_dir: str = "Data_Sheets",
         logger: Optional[Callable] = None
     ):
         """
         @brief Initialize the datasheet localizer
         
         @param project_dir: Path to the project directory
-        @param datasheet_dir: Name of the local datasheet directory (default: "Datasheets")
+        @param datasheet_dir: Name of the local datasheet directory (default: "Data_Sheets")
         @param logger: Optional logger object with info/warning/error methods
         """
         super().__init__(logger)

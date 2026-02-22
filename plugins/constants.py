@@ -98,6 +98,7 @@ DEFAULT_LOCAL_LIB_NAME = "MyLib"
 DEFAULT_SYMBOL_LIB_NAME = "MySymbols"
 DEFAULT_SYMBOL_DIR_NAME = "MySym"
 DEFAULT_MODELS_DIR_NAME = "3D Models"
+DEFAULT_DATASHEETS_DIR_NAME = "Data_Sheets"
 
 # File extensions
 EXTENSION_FOOTPRINT = ".kicad_mod"
@@ -179,4 +180,5 @@ CONFIG_LOCAL_LIB_NAME = "local_lib_name"
 CONFIG_SYMBOL_LIB_NAME = "symbol_lib_name"
 CONFIG_SYMBOL_DIR_NAME = "symbol_dir_name"
 CONFIG_MODELS_DIR_NAME = "models_dir_name"
+CONFIG_DATASHEETS_DIR_NAME = "datasheets_dir_name"
 CONFIG_CREATE_BACKUPS = "create_backups"

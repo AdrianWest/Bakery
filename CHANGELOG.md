@@ -45,6 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated installation instructions with KiCad Plugin Manager and install from ZIP options
   - Updated usage instructions to highlight icon button in toolbar
   - Replaced text reference with actual Bakery icon image in README
+- **Code quality improvements**
+  - Consolidated repetitive code in data_sheet_localizer.py
+  - Extracted _is_valid_pdf() helper method for PDF validation
+  - Extracted _should_update_file() helper method for file date comparison
+  - Extracted _update_file_references() helper method to consolidate schematic and symbol reference updates
+  - Reduced code duplication by 41 lines (57 insertions, 98 deletions)
+- **Plugin workflow integration**
+  - Integrated datasheet localization into main bakery_plugin.py workflow
+  - Datasheet localization now runs automatically after symbol localization (Step 11)
+  - Added datasheet statistics to progress logging and completion messages
+  - Datasheet processing only runs when symbols are copied (since datasheets are stored in symbols)
 
 ## [1.0.2] - 2026-01-19
 

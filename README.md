@@ -62,7 +62,7 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 ## Usage
 
 1. Open your KiCad project and PCB file in pcbnew
-2. Go to **Tools** > **External Plugins** > **Bakery - Localize Symbols, Footprints, and 3d Models**
+2. Click the **Bakery** icon button in the top toolbar (or go to **Tools** > **External Plugins** > **Bakery - Localize Symbols, Footprints, and 3d Models**)
 3. Configure options in the dialog:
    - Local library name for footprints (default: "MyLib")
    - Symbol library name (default: "MySymbols")

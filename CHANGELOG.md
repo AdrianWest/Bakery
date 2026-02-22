@@ -13,10 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Datasheet localization feature**
   - New data_sheet_localizer.py module for datasheet management
   - Scans symbol libraries for datasheet property references
-  - Automatically copies component datasheets to project directory
+  - Downloads PDF datasheets from internet URLs (http://, https://)
+  - Copies local PDF datasheet files to project directory
+  - Only processes PDF format datasheets (.pdf extension) - non-PDF files are skipped
+  - Automatic deduplication to avoid copying same datasheet multiple times
   - Creates and manages project-local datasheet library (default: "Data_Sheets")
   - Updates datasheet references in symbols to point to local copies using ${KIPRJMOD}
-  - Preserves original datasheet file structure during copy operations
   - Progress tracking for datasheet copy operations
   - GUI configuration option for customizable datasheets directory name
 - **Icon enhancement support**

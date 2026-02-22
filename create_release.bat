@@ -63,6 +63,7 @@ copy "plugins\base_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\constants.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\footprint_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\symbol_localizer.py" "%RELEASE_DIR%\plugins\" > nul
+copy "plugins\data_sheet_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\library_manager.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\sexpr_parser.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\ui_components.py" "%RELEASE_DIR%\plugins\" > nul

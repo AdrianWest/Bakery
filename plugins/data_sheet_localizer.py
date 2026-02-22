@@ -413,6 +413,6 @@ class DataSheetLocalizer(BaseLocalizer):
         
         total_updated = updated_count + schematic_updated_count
         
-        self.log("success", f"Datasheet localization complete: {copied_count} copied, {total_updated} files updated ({updated_count} symbol libs, {schematic_updated_count} schematics)")
+        self.log("success", f"Datasheet localization complete: {copied_count} datasheets copied/downloaded, {total_updated} files updated ({updated_count} symbol libs, {schematic_updated_count} schematics)")
         
         return (copied_count, total_updated)

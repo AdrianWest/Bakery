@@ -144,7 +144,7 @@ class DataSheetLocalizer(BaseLocalizer):
         self,
         datasheets: List[Tuple[str, str]],
         progress_callback: Optional[Callable] = None
-    ) -> int:
+    ) -> Tuple[int, int]:
         """
         @brief Copy or download datasheets to local project directory
         
@@ -159,7 +159,7 @@ class DataSheetLocalizer(BaseLocalizer):
         @param datasheets: List of (component_name, datasheet_ref) tuples
         @param progress_callback: Optional callback for progress updates
         
-        @return Number of datasheets successfully copied/downloaded
+        @return Tuple of (downloaded_count, copied_count) for internet downloads and local file copies
         """
         self.log("info", f"Copying datasheets to: {self.datasheet_dir_path}")
         
@@ -176,6 +176,7 @@ class DataSheetLocalizer(BaseLocalizer):
         
         self.log("info", f"Found {len(datasheets)} total references, {len(unique_datasheets)} unique datasheets")
         
+        downloaded_count = 0
         copied_count = 0
         
         # TODO: Implement datasheet copying logic
@@ -194,6 +195,7 @@ class DataSheetLocalizer(BaseLocalizer):
         #       * Log: Kept existing file or downloaded new file
         #       * Save to ${KIPRJMOD}/Data_Sheets/
         #       * Log: Download successful with destination path
+        #       * Increment downloaded_count on success
         #   - If local file path: 
         #       * Log: Identified as local file copy
         #       * Verify file has .pdf extension
@@ -205,13 +207,15 @@ class DataSheetLocalizer(BaseLocalizer):
         #       * Log: Kept existing file or copied new file
         #       * Preserve original filename
         #       * Log: Copy successful with destination path
+        #       * Increment copied_count on success
         #   - Track successful copies/downloads
         #   - Build mapping of old refs to new local paths for update step
         #   - Log skipped non-PDF datasheets
         #   - Log when existing files are preserved due to being newer
         #   - Log any errors encountered during copy/download operations
         
-        return copied_count
+        self.log("info", f"Downloaded {downloaded_count} datasheets from internet, copied {copied_count} from local files")
+        return (downloaded_count, copied_count)
     
     def download_datasheet(self, url: str, dest_path: str) -> bool:
         """
@@ -391,7 +395,8 @@ class DataSheetLocalizer(BaseLocalizer):
         self.log("info", f"Found {len(all_datasheets)} datasheet references in symbols")
         
         # Copy/download datasheets
-        copied_count = self.copy_datasheets(all_datasheets, progress_callback)
+        downloaded_count, copied_count = self.copy_datasheets(all_datasheets, progress_callback)
+        total_datasheets = downloaded_count + copied_count
         
         # TODO: Build datasheet_map dictionary from copy results
         # datasheet_map = {old_url_or_path: new_local_path}
@@ -413,6 +418,6 @@ class DataSheetLocalizer(BaseLocalizer):
         
         total_updated = updated_count + schematic_updated_count
         
-        self.log("success", f"Datasheet localization complete: {copied_count} datasheets copied/downloaded, {total_updated} files updated ({updated_count} symbol libs, {schematic_updated_count} schematics)")
+        self.log("success", f"Datasheet localization complete: {total_datasheets} datasheets processed ({downloaded_count} downloaded from internet, {copied_count} copied from local files), {total_updated} files updated ({updated_count} symbol libs, {schematic_updated_count} schematics)")
         
-        return (copied_count, total_updated)
+        return (total_datasheets, total_updated)

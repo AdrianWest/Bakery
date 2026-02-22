@@ -76,6 +76,7 @@ class DataSheetLocalizer(BaseLocalizer):
     - :py:meth:`~DataSheetLocalizer.scan_symbol_datasheets`
     - :py:meth:`~DataSheetLocalizer.copy_datasheets`
     - :py:meth:`~DataSheetLocalizer.download_datasheet`
+    - :py:meth:`~DataSheetLocalizer.update_schematic_references`
     - :py:meth:`~DataSheetLocalizer.update_symbol_references`
     - :py:meth:`~DataSheetLocalizer.localize_all_datasheets`
     
@@ -256,6 +257,44 @@ class DataSheetLocalizer(BaseLocalizer):
         
         return False
     
+    def update_schematic_references(
+        self,
+        schematic_path: str,
+        datasheet_map: dict
+    ) -> bool:
+        """
+        @brief Update datasheet references in schematic file to point to local copies
+        
+        Scans schematic file for (property "Datasheet" "value") entries and replaces
+        old datasheet URLs or paths with new local paths using ${KIPRJMOD} variable.
+        
+        Example: (property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf")
+        becomes: (property "Datasheet" "${KIPRJMOD}/Data_Sheets/1n4001.pdf")
+        
+        @param schematic_path: Path to .kicad_sch file
+        @param datasheet_map: Dictionary mapping old refs to new local paths
+        
+        @return True if update successful, False otherwise
+        """
+        self.log("info", f"Updating datasheet references in schematic: {schematic_path}")
+        
+        # TODO: Implement schematic file update logic
+        # Log: Starting schematic reference update process
+        # Read schematic file content
+        # Find all (property "Datasheet" "value") entries
+        # Log: Number of datasheet properties found
+        # For each datasheet property:
+        #   - Check if old value is in datasheet_map
+        #   - If found, replace with new local path using ${KIPRJMOD}
+        #   - Log: Each reference being updated (old -> new)
+        # Create backup before modifying
+        # Log: Backup creation status
+        # Write updated content back to file
+        # Log: File write success
+        # Log: Total number of references updated in this schematic
+        
+        return False
+    
     def update_symbol_references(
         self,
         symbol_lib_path: str,
@@ -288,16 +327,19 @@ class DataSheetLocalizer(BaseLocalizer):
     def localize_all_datasheets(
         self,
         symbol_libs: List[str],
+        schematic_files: List[str],
         progress_callback: Optional[Callable] = None
     ) -> Tuple[int, int]:
         """
         @brief Main entry point to localize all datasheets in the project
         
         Scans all symbol libraries for datasheet references, copies/downloads 
-        datasheets, and updates all references. In KiCad, datasheets are stored
-        in symbol definitions.
+        datasheets, and updates all references in both symbol libraries and 
+        schematic files. In KiCad, datasheets are stored in symbol definitions
+        but are also referenced in schematic files.
         
         @param symbol_libs: List of symbol library paths to scan
+        @param schematic_files: List of schematic file paths (.kicad_sch) to update
         @param progress_callback: Optional callback for progress updates
         
         @return Tuple of (datasheets_copied, references_updated)
@@ -317,9 +359,26 @@ class DataSheetLocalizer(BaseLocalizer):
         # Copy/download datasheets
         copied_count = self.copy_datasheets(all_datasheets, progress_callback)
         
+        # TODO: Build datasheet_map dictionary from copy results
+        # datasheet_map = {old_url_or_path: new_local_path}
+        
         # TODO: Update all references in symbol library files
         updated_count = 0
+        # for symbol_lib in symbol_libs:
+        #     if self.update_symbol_references(symbol_lib, datasheet_map):
+        #         updated_count += 1
         
-        self.log("success", f"Datasheet localization complete: {copied_count} copied, {updated_count} references updated")
+        # Update all references in schematic files
+        self.log("info", f"Updating datasheet references in {len(schematic_files)} schematic files")
+        schematic_updated_count = 0
+        # TODO: Uncomment when datasheet_map is available
+        # for schematic_file in schematic_files:
+        #     if os.path.exists(schematic_file):
+        #         if self.update_schematic_references(schematic_file, datasheet_map):
+        #             schematic_updated_count += 1
         
-        return (copied_count, updated_count)
+        total_updated = updated_count + schematic_updated_count
+        
+        self.log("success", f"Datasheet localization complete: {copied_count} copied, {total_updated} files updated ({updated_count} symbol libs, {schematic_updated_count} schematics)")
+        
+        return (copied_count, total_updated)

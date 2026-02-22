@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-22
+
+### Added
+- **Datasheet localization feature**
+  - Automatically copies component datasheets to project directory
+  - Creates and manages project-local datasheet library
+  - Updates datasheet references in symbols and footprints to point to local copies
+  - Preserves original datasheet file structure during copy operations
+  - Progress tracking for datasheet copy operations
+- **Icon enhancement support**
+  - Improved icon handling in KiCad plugin interface
+  - Support for copying component icons to project libraries
+  - Enhanced plugin icon display in KiCad menus
+  - Better visual integration with KiCad UI
+
+### Changed
+- Extended S-expression parser to handle datasheet properties
+- Enhanced file handling for datasheet and icon resources
+- Updated progress tracking to include datasheet operations
+
 ## [1.0.2] - 2026-01-19
 
 ### Changed

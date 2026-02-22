@@ -50,8 +50,10 @@ datasheets are stored in symbol definitions, not footprints.
 
 import os
 import shutil
-from typing import List, Optional, Callable, Set, Tuple
-from urllib.parse import urlparse
+import urllib.request
+import urllib.error
+from typing import List, Optional, Callable, Set, Tuple, Dict
+from urllib.parse import urlparse, unquote
 
 from .constants import (
     EXTENSION_SYMBOL_LIB, EXTENSION_FOOTPRINT,
@@ -126,17 +128,55 @@ class DataSheetLocalizer(BaseLocalizer):
         self.log("info", f"Scanning symbol library for datasheets: {symbol_lib_path}")
         datasheets = []
         
-        # TODO: Implement symbol library parsing for datasheet properties
-        # Parse .kicad_sym file using S-expression parser
-        # Find (symbol ...) entries
-        # Within each symbol, find (property "Datasheet" "value") entries
-        # Extract symbol names and datasheet values
-        # Filter out empty datasheets ("" or "~")
-        # Filter out non-PDF datasheets (only process .pdf files)
-        # Use a set to track unique datasheet URLs to avoid duplicates
-        # Log: Number of symbols scanned
-        # Log: Number of datasheet references found
-        # Log: Number of non-PDF datasheets skipped
+        # Read and parse symbol library file
+        content = safe_read_file(symbol_lib_path)
+        if not content:
+            self.log("error", f"Failed to read symbol library: {symbol_lib_path}")
+            return datasheets
+        
+        try:
+            # Parse S-expressions
+            parsed = self.parser.parse(content)
+            if not parsed:
+                self.log("warning", f"Failed to parse symbol library: {symbol_lib_path}")
+                return datasheets
+            
+            symbols_found = 0
+            datasheets_found = 0
+            non_pdf_skipped = 0
+            seen_datasheets = set()  # Track unique datasheet URLs
+            
+            # Find all symbols in the library
+            for item in parsed:
+                if isinstance(item, list) and len(item) > 0 and item[0] == 'symbol':
+                    symbols_found += 1
+                    symbol_name = item[1] if len(item) > 1 else "unknown"
+                    
+                    # Look for datasheet property in this symbol
+                    for sub_item in item:
+                        if isinstance(sub_item, list) and len(sub_item) >= 3:
+                            if sub_item[0] == 'property' and sub_item[1] == 'Datasheet':
+                                datasheet_value = sub_item[2]
+                                
+                                # Filter out empty datasheets
+                                if datasheet_value and datasheet_value not in ('', '~'):
+                                    # Check if it's a PDF
+                                    if datasheet_value.lower().endswith('.pdf'):
+                                        # Only add if we haven't seen this datasheet before
+                                        if datasheet_value not in seen_datasheets:
+                                            datasheets.append((symbol_name, datasheet_value))
+                                            seen_datasheets.add(datasheet_value)
+                                            datasheets_found += 1
+                                    else:
+                                        non_pdf_skipped += 1
+            
+            self.log("info", f"Scanned {symbols_found} symbols")
+            self.log("info", f"Found {datasheets_found} unique PDF datasheet references")
+            if non_pdf_skipped > 0:
+                self.log("info", f"Skipped {non_pdf_skipped} non-PDF datasheets")
+                
+        except Exception as e:
+            self.log("error", f"Error parsing symbol library: {str(e)}")
         
         return datasheets
     
@@ -178,41 +218,76 @@ class DataSheetLocalizer(BaseLocalizer):
         
         downloaded_count = 0
         copied_count = 0
+        self.datasheet_map = {}  # Store mapping for reference updates
         
-        # TODO: Implement datasheet copying logic
-        # For each unique datasheet reference:
-        #   - Log: Starting to process datasheet (URL or path)
-        #   - Check if reference ends with .pdf (case-insensitive) - skip if not PDF
-        #   - Log: Skipped non-PDF datasheet if applicable
-        #   - Determine if it's a URL (starts with http:// or https://) or local file path
-        #   - If URL: 
-        #       * Log: Identified as URL download
-        #       * Verify URL ends with .pdf
-        #       * Download PDF from internet to local directory
-        #       * Extract filename from URL or generate from component name
-        #       * If destination file exists, compare dates and keep the latest version
-        #       * Log: Existing file date vs new file date comparison
-        #       * Log: Kept existing file or downloaded new file
-        #       * Save to ${KIPRJMOD}/Data_Sheets/
-        #       * Log: Download successful with destination path
-        #       * Increment downloaded_count on success
-        #   - If local file path: 
-        #       * Log: Identified as local file copy
-        #       * Verify file has .pdf extension
-        #       * Expand KiCad path variables (${KIPRJMOD}, etc.)
-        #       * Log: Source file path after variable expansion
-        #       * If destination file exists, compare modification dates and keep the latest
-        #       * Log: File date comparison results
-        #       * Copy file to local directory only if source is newer or file doesn't exist
-        #       * Log: Kept existing file or copied new file
-        #       * Preserve original filename
-        #       * Log: Copy successful with destination path
-        #       * Increment copied_count on success
-        #   - Track successful copies/downloads
-        #   - Build mapping of old refs to new local paths for update step
-        #   - Log skipped non-PDF datasheets
-        #   - Log when existing files are preserved due to being newer
-        #   - Log any errors encountered during copy/download operations
+        # Process each unique datasheet reference
+        for datasheet_ref, comp_name in unique_datasheets.items():
+            self.log("info", f"Processing datasheet: {datasheet_ref}")
+            
+            # Check if it's a PDF
+            if not datasheet_ref.lower().endswith('.pdf'):
+                self.log("info", f"Skipping non-PDF datasheet: {datasheet_ref}")
+                continue
+            
+            # Determine if it's a URL or local file path
+            is_url = datasheet_ref.startswith('http://') or datasheet_ref.startswith('https://')
+            
+            # Extract filename from URL or path
+            if is_url:
+                # Get filename from URL
+                parsed_url = urlparse(datasheet_ref)
+                filename = os.path.basename(unquote(parsed_url.path))
+                if not filename or not filename.endswith('.pdf'):
+                    # Generate filename from component name
+                    filename = f"{comp_name.replace(':', '_').replace('/', '_')}.pdf"
+            else:
+                # Local file path - get just the filename
+                filename = os.path.basename(datasheet_ref)
+            
+            dest_path = os.path.join(self.datasheet_dir_path, filename)
+            new_ref = f"${{KIPRJMOD}}/{self.datasheet_dir}/{filename}"
+            
+            if is_url:
+                # Download from internet
+                self.log("info", f"Identified as URL download: {filename}")
+                if self.download_datasheet(datasheet_ref, dest_path):
+                    downloaded_count += 1
+                    self.datasheet_map[datasheet_ref] = new_ref
+                    self.log("success", f"Downloaded: {filename}")
+            else:
+                # Copy local file
+                self.log("info", f"Identified as local file copy: {filename}")
+                
+                # Expand KiCad path variables
+                expanded_path = expand_kicad_path(datasheet_ref, self.project_dir)
+                self.log("info", f"Source path: {expanded_path}")
+                
+                if not os.path.exists(expanded_path):
+                    self.log("error", f"Source file not found: {expanded_path}")
+                    continue
+                
+                try:
+                    # Check if destination exists and compare dates
+                    if os.path.exists(dest_path):
+                        source_mtime = os.path.getmtime(expanded_path)
+                        dest_mtime = os.path.getmtime(dest_path)
+                        
+                        if source_mtime <= dest_mtime:
+                            self.log("info", f"Destination file is up-to-date: {filename}")
+                            copied_count += 1
+                            self.datasheet_map[datasheet_ref] = new_ref
+                            continue
+                        else:
+                            self.log("info", f"Source file is newer, copying")
+                    
+                    # Copy file
+                    shutil.copy2(expanded_path, dest_path)
+                    copied_count += 1
+                    self.datasheet_map[datasheet_ref] = new_ref
+                    self.log("success", f"Copied: {filename}")
+                    
+                except Exception as e:
+                    self.log("error", f"Error copying file: {str(e)}")
         
         self.log("info", f"Downloaded {downloaded_count} datasheets from internet, copied {copied_count} from local files")
         return (downloaded_count, copied_count)
@@ -238,28 +313,71 @@ class DataSheetLocalizer(BaseLocalizer):
         """
         self.log("info", f"Downloading datasheet from: {url}")
         
-        # TODO: Implement URL download logic
-        # Log: Starting download attempt
-        # Verify URL ends with .pdf (case-insensitive) before downloading
-        # Log: URL validation result
-        # Check if dest_path already exists
-        # Log: Destination file exists or not
-        # If exists, get HTTP Last-Modified header from URL and compare with local file date
-        # Log: Remote file date vs local file date
-        # Only download if remote file is newer or local file doesn't exist
-        # Log: Decision to download or skip based on date comparison
-        # Use urllib.request or requests library to download file
-        # Log: Download progress or status
-        # Handle HTTP errors gracefully (404, timeouts, etc.)
-        # Log: Any HTTP errors encountered (error code and message)
-        # Verify file was downloaded successfully
-        # Log: File size and download completion
-        # Check if downloaded file is a valid PDF (magic bytes)
-        # Log: PDF validation result
-        # Log when existing file is preserved due to being newer
-        # Log: Final success or failure status
+        # Verify URL ends with .pdf
+        if not url.lower().endswith('.pdf'):
+            self.log("warning", f"URL does not end with .pdf, skipping: {url}")
+            return False
         
-        return False
+        try:
+            # Check if destination file already exists
+            if os.path.exists(dest_path):
+                self.log("info", f"Destination file already exists: {dest_path}")
+                # Get local file modification time
+                local_mtime = os.path.getmtime(dest_path)
+                
+                # Try to get remote file modification time
+                try:
+                    req = urllib.request.Request(url, method='HEAD')
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        last_modified = response.headers.get('Last-Modified')
+                        if last_modified:
+                            from email.utils import parsedate_to_datetime
+                            remote_mtime = parsedate_to_datetime(last_modified).timestamp()
+                            
+                            if remote_mtime <= local_mtime:
+                                self.log("info", f"Local file is up-to-date, skipping download")
+                                return True  # File exists and is current
+                            else:
+                                self.log("info", f"Remote file is newer, downloading update")
+                        else:
+                            self.log("info", f"Cannot determine remote file date, re-downloading")
+                except Exception as e:
+                    self.log("warning", f"Cannot check remote file date: {str(e)}, re-downloading")
+            
+            # Download the file
+            self.log("info", f"Downloading to: {dest_path}")
+            urllib.request.urlretrieve(url, dest_path)
+            
+            # Verify file was downloaded
+            if not os.path.exists(dest_path):
+                self.log("error", f"File was not downloaded: {dest_path}")
+                return False
+            
+            file_size = os.path.getsize(dest_path)
+            self.log("success", f"Downloaded successfully ({file_size} bytes)")
+            
+            # Verify it's a PDF (check magic bytes)
+            try:
+                with open(dest_path, 'rb') as f:
+                    header = f.read(4)
+                    if header != b'%PDF':
+                        self.log("warning", f"Downloaded file does not appear to be a PDF")
+                    else:
+                        self.log("info", f"PDF validation successful")
+            except Exception as e:
+                self.log("warning", f"Could not validate PDF: {str(e)}")
+            
+            return True
+            
+        except urllib.error.HTTPError as e:
+            self.log("error", f"HTTP error {e.code} downloading {url}: {str(e)}")
+            return False
+        except urllib.error.URLError as e:
+            self.log("error", f"URL error downloading {url}: {str(e)}")
+            return False
+        except Exception as e:
+            self.log("error", f"Error downloading {url}: {str(e)}")
+            return False
     
     def update_schematic_references(
         self,
@@ -282,22 +400,53 @@ class DataSheetLocalizer(BaseLocalizer):
         """
         self.log("info", f"Updating datasheet references in schematic: {schematic_path}")
         
-        # TODO: Implement schematic file update logic
-        # Log: Starting schematic reference update process
-        # Read schematic file content
-        # Find all (property "Datasheet" "value") entries
-        # Log: Number of datasheet properties found
-        # For each datasheet property:
-        #   - Check if old value is in datasheet_map
-        #   - If found, replace with new local path using ${KIPRJMOD}
-        #   - Log: Each reference being updated (old -> new)
-        # Create backup before modifying
-        # Log: Backup creation status
-        # Write updated content back to file
-        # Log: File write success
-        # Log: Total number of references updated in this schematic
+        if not datasheet_map:
+            self.log("info", "No datasheet mappings to apply")
+            return True
         
-        return False
+        # Read schematic file content
+        content = safe_read_file(schematic_path)
+        if not content:
+            self.log("error", f"Failed to read schematic: {schematic_path}")
+            return False
+        
+        self.log("info", "Starting schematic reference update process")
+        
+        original_content = content
+        updates_made = 0
+        
+        # Find and replace all datasheet property values
+        for old_ref, new_ref in datasheet_map.items():
+            if old_ref in content:
+                # Count occurrences before replacement
+                occurrences = content.count(old_ref)
+                content = content.replace(old_ref, new_ref)
+                updates_made += occurrences
+                self.log("info", f"Updated {occurrences} reference(s): {old_ref} -> {new_ref}")
+        
+        # Only write if changes were made
+        if content == original_content:
+            self.log("info", "No datasheet references needed updating in this schematic")
+            return True
+        
+        # Create backup before modifying
+        self.log("info", "Creating backup before modifying schematic")
+        if not self.backup_manager.create_backup(schematic_path):
+            self.log("warning", f"Failed to create backup for: {schematic_path}")
+            # Continue anyway as this is not critical
+        else:
+            self.log("info", "Backup created successfully")
+        
+        # Write updated content back to file
+        try:
+            with open(schematic_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            self.log("success", f"Schematic updated successfully: {schematic_path}")
+            self.log("info", f"Total references updated in this schematic: {updates_made}")
+            return True
+        except Exception as e:
+            self.log("error", f"Failed to write updated schematic: {str(e)}")
+            return False
     
     def update_symbol_references(
         self,
@@ -398,23 +547,28 @@ class DataSheetLocalizer(BaseLocalizer):
         downloaded_count, copied_count = self.copy_datasheets(all_datasheets, progress_callback)
         total_datasheets = downloaded_count + copied_count
         
-        # TODO: Build datasheet_map dictionary from copy results
-        # datasheet_map = {old_url_or_path: new_local_path}
+        # Get datasheet_map from copy operation
+        datasheet_map = getattr(self, 'datasheet_map', {})
         
-        # TODO: Update all references in symbol library files
+        if not datasheet_map:
+            self.log("warning", "No datasheet mappings created, skipping reference updates")
+            return (total_datasheets, 0)
+        
+        # Update all references in symbol library files
+        self.log("info", f"Updating datasheet references in {len(symbol_libs)} symbol libraries")
         updated_count = 0
-        # for symbol_lib in symbol_libs:
-        #     if self.update_symbol_references(symbol_lib, datasheet_map):
-        #         updated_count += 1
+        for symbol_lib in symbol_libs:
+            if os.path.exists(symbol_lib):
+                if self.update_symbol_references(symbol_lib, datasheet_map):
+                    updated_count += 1
         
         # Update all references in schematic files
         self.log("info", f"Updating datasheet references in {len(schematic_files)} schematic files")
         schematic_updated_count = 0
-        # TODO: Uncomment when datasheet_map is available
-        # for schematic_file in schematic_files:
-        #     if os.path.exists(schematic_file):
-        #         if self.update_schematic_references(schematic_file, datasheet_map):
-        #             schematic_updated_count += 1
+        for schematic_file in schematic_files:
+            if os.path.exists(schematic_file):
+                if self.update_schematic_references(schematic_file, datasheet_map):
+                    schematic_updated_count += 1
         
         total_updated = updated_count + schematic_updated_count
         

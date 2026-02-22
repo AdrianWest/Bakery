@@ -11,11 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Datasheet localization feature**
+  - New data_sheet_localizer.py module for datasheet management
+  - Scans symbol libraries for datasheet property references
   - Automatically copies component datasheets to project directory
-  - Creates and manages project-local datasheet library
-  - Updates datasheet references in symbols and footprints to point to local copies
+  - Creates and manages project-local datasheet library (default: "Data_Sheets")
+  - Updates datasheet references in symbols to point to local copies using ${KIPRJMOD}
   - Preserves original datasheet file structure during copy operations
   - Progress tracking for datasheet copy operations
+  - GUI configuration option for customizable datasheets directory name
 - **Icon enhancement support**
   - Improved icon handling in KiCad plugin interface
   - Support for copying component icons to project libraries

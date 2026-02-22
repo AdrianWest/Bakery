@@ -267,20 +267,14 @@ class DataSheetLocalizer(BaseLocalizer):
                     continue
                 
                 try:
-                    # Check if destination exists and compare dates
-                    if os.path.exists(dest_path):
-                        source_mtime = os.path.getmtime(expanded_path)
-                        dest_mtime = os.path.getmtime(dest_path)
-                        
-                        if source_mtime <= dest_mtime:
-                            self.log("info", f"Destination file is up-to-date: {filename}")
-                            copied_count += 1
-                            self.datasheet_map[datasheet_ref] = new_ref
-                            continue
-                        else:
-                            self.log("info", f"Source file is newer, copying")
+                    # Check if we need to update the destination file
+                    if os.path.exists(dest_path) and not self._should_update_file(expanded_path, dest_path):
+                        self.log("info", f"Destination file is up-to-date: {filename}")
+                        copied_count += 1
+                        self.datasheet_map[datasheet_ref] = new_ref
+                        continue
                     
-                    # Copy file
+                    # Copy file (either new or updating existing)
                     shutil.copy2(expanded_path, dest_path)
                     copied_count += 1
                     self.datasheet_map[datasheet_ref] = new_ref
@@ -356,16 +350,11 @@ class DataSheetLocalizer(BaseLocalizer):
             file_size = os.path.getsize(dest_path)
             self.log("success", f"Downloaded successfully ({file_size} bytes)")
             
-            # Verify it's a PDF (check magic bytes)
-            try:
-                with open(dest_path, 'rb') as f:
-                    header = f.read(4)
-                    if header != b'%PDF':
-                        self.log("warning", f"Downloaded file does not appear to be a PDF")
-                    else:
-                        self.log("info", f"PDF validation successful")
-            except Exception as e:
-                self.log("warning", f"Could not validate PDF: {str(e)}")
+            # Verify it's a PDF
+            if self._is_valid_pdf(dest_path):
+                self.log("info", f"PDF validation successful")
+            else:
+                self.log("warning", f"Downloaded file does not appear to be a PDF")
             
             return True
             
@@ -377,6 +366,72 @@ class DataSheetLocalizer(BaseLocalizer):
             return False
         except Exception as e:
             self.log("error", f"Error downloading {url}: {str(e)}")
+            return False
+    
+    def _update_file_references(
+        self,
+        file_path: str,
+        datasheet_map: dict,
+        file_type: str
+    ) -> bool:
+        """
+        @brief Generic method to update datasheet references in any KiCad file
+        
+        Reads file, replaces old datasheet references with new local paths,
+        creates backup, and writes updated content.
+        
+        @param file_path: Path to file to update (.kicad_sym or .kicad_sch)
+        @param datasheet_map: Dictionary mapping old refs to new local paths
+        @param file_type: Description of file type for logging ("schematic" or "symbol library")
+        
+        @return True if update successful, False otherwise
+        """
+        self.log("info", f"Updating datasheet references in {file_type}: {file_path}")
+        
+        if not datasheet_map:
+            self.log("info", "No datasheet mappings to apply")
+            return True
+        
+        # Read file content
+        content = safe_read_file(file_path)
+        if not content:
+            self.log("error", f"Failed to read {file_type}: {file_path}")
+            return False
+        
+        self.log("info", f"Starting {file_type} reference update process")
+        
+        original_content = content
+        updates_made = 0
+        
+        # Replace old datasheet references with new local paths
+        for old_ref, new_ref in datasheet_map.items():
+            if old_ref in content:
+                occurrences = content.count(old_ref)
+                content = content.replace(old_ref, new_ref)
+                updates_made += occurrences
+                self.log("info", f"Updated {occurrences} reference(s): {old_ref} -> {new_ref}")
+        
+        # Only write if changes were made
+        if content == original_content:
+            self.log("info", f"No datasheet references needed updating in this {file_type}")
+            return True
+        
+        # Create backup before modifying
+        self.log("info", f"Creating backup before modifying {file_type}")
+        if not self.backup_manager.create_backup(file_path):
+            self.log("warning", f"Failed to create backup for: {file_path}")
+        else:
+            self.log("info", "Backup created successfully")
+        
+        # Write updated content back to file
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            self.log("success", f"{file_type.capitalize()} updated successfully: {file_path}")
+            self.log("info", f"Total references updated in this {file_type}: {updates_made}")
+            return True
+        except Exception as e:
+            self.log("error", f"Failed to write updated {file_type}: {str(e)}")
             return False
     
     def update_schematic_references(
@@ -398,55 +453,7 @@ class DataSheetLocalizer(BaseLocalizer):
         
         @return True if update successful, False otherwise
         """
-        self.log("info", f"Updating datasheet references in schematic: {schematic_path}")
-        
-        if not datasheet_map:
-            self.log("info", "No datasheet mappings to apply")
-            return True
-        
-        # Read schematic file content
-        content = safe_read_file(schematic_path)
-        if not content:
-            self.log("error", f"Failed to read schematic: {schematic_path}")
-            return False
-        
-        self.log("info", "Starting schematic reference update process")
-        
-        original_content = content
-        updates_made = 0
-        
-        # Find and replace all datasheet property values
-        for old_ref, new_ref in datasheet_map.items():
-            if old_ref in content:
-                # Count occurrences before replacement
-                occurrences = content.count(old_ref)
-                content = content.replace(old_ref, new_ref)
-                updates_made += occurrences
-                self.log("info", f"Updated {occurrences} reference(s): {old_ref} -> {new_ref}")
-        
-        # Only write if changes were made
-        if content == original_content:
-            self.log("info", "No datasheet references needed updating in this schematic")
-            return True
-        
-        # Create backup before modifying
-        self.log("info", "Creating backup before modifying schematic")
-        if not self.backup_manager.create_backup(schematic_path):
-            self.log("warning", f"Failed to create backup for: {schematic_path}")
-            # Continue anyway as this is not critical
-        else:
-            self.log("info", "Backup created successfully")
-        
-        # Write updated content back to file
-        try:
-            with open(schematic_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            self.log("success", f"Schematic updated successfully: {schematic_path}")
-            self.log("info", f"Total references updated in this schematic: {updates_made}")
-            return True
-        except Exception as e:
-            self.log("error", f"Failed to write updated schematic: {str(e)}")
-            return False
+        return self._update_file_references(schematic_path, datasheet_map, "schematic")
     
     def update_symbol_references(
         self,
@@ -461,55 +468,7 @@ class DataSheetLocalizer(BaseLocalizer):
         
         @return True if update successful, False otherwise
         """
-        self.log("info", f"Updating datasheet references in symbol library: {symbol_lib_path}")
-        
-        if not datasheet_map:
-            self.log("info", "No datasheet mappings to apply")
-            return True
-        
-        # Read symbol library content
-        content = safe_read_file(symbol_lib_path)
-        if not content:
-            self.log("error", f"Failed to read symbol library: {symbol_lib_path}")
-            return False
-        
-        self.log("info", "Starting reference update process")
-        
-        original_content = content
-        updates_made = 0
-        
-        # Replace old datasheet references with ${KIPRJMOD}/Data_Sheets/... paths
-        for old_ref, new_ref in datasheet_map.items():
-            if old_ref in content:
-                # Count occurrences before replacement
-                occurrences = content.count(old_ref)
-                content = content.replace(old_ref, new_ref)
-                updates_made += occurrences
-                self.log("info", f"Updated {occurrences} reference(s): {old_ref} -> {new_ref}")
-        
-        # Only write if changes were made
-        if content == original_content:
-            self.log("info", "No datasheet references needed updating")
-            return True
-        
-        # Create backup before modifying
-        self.log("info", "Creating backup before modifying symbol library")
-        if not self.backup_manager.create_backup(symbol_lib_path):
-            self.log("warning", f"Failed to create backup for: {symbol_lib_path}")
-            # Continue anyway as this is not critical
-        else:
-            self.log("info", "Backup created successfully")
-        
-        # Write updated content back to file
-        try:
-            with open(symbol_lib_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            self.log("success", f"Symbol library updated successfully: {symbol_lib_path}")
-            self.log("info", f"Total references updated: {updates_made}")
-            return True
-        except Exception as e:
-            self.log("error", f"Failed to write updated symbol library: {str(e)}")
-            return False
+        return self._update_file_references(symbol_lib_path, datasheet_map, "symbol library")
     
     def localize_all_datasheets(
         self,

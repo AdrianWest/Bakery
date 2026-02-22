@@ -133,6 +133,9 @@ class DataSheetLocalizer(BaseLocalizer):
         # Filter out empty datasheets ("" or "~")
         # Filter out non-PDF datasheets (only process .pdf files)
         # Use a set to track unique datasheet URLs to avoid duplicates
+        # Log: Number of symbols scanned
+        # Log: Number of datasheet references found
+        # Log: Number of non-PDF datasheets skipped
         
         return datasheets
     
@@ -176,24 +179,36 @@ class DataSheetLocalizer(BaseLocalizer):
         
         # TODO: Implement datasheet copying logic
         # For each unique datasheet reference:
+        #   - Log: Starting to process datasheet (URL or path)
         #   - Check if reference ends with .pdf (case-insensitive) - skip if not PDF
+        #   - Log: Skipped non-PDF datasheet if applicable
         #   - Determine if it's a URL (starts with http:// or https://) or local file path
         #   - If URL: 
+        #       * Log: Identified as URL download
         #       * Verify URL ends with .pdf
         #       * Download PDF from internet to local directory
         #       * Extract filename from URL or generate from component name
         #       * If destination file exists, compare dates and keep the latest version
+        #       * Log: Existing file date vs new file date comparison
+        #       * Log: Kept existing file or downloaded new file
         #       * Save to ${KIPRJMOD}/Data_Sheets/
+        #       * Log: Download successful with destination path
         #   - If local file path: 
+        #       * Log: Identified as local file copy
         #       * Verify file has .pdf extension
         #       * Expand KiCad path variables (${KIPRJMOD}, etc.)
+        #       * Log: Source file path after variable expansion
         #       * If destination file exists, compare modification dates and keep the latest
+        #       * Log: File date comparison results
         #       * Copy file to local directory only if source is newer or file doesn't exist
+        #       * Log: Kept existing file or copied new file
         #       * Preserve original filename
+        #       * Log: Copy successful with destination path
         #   - Track successful copies/downloads
         #   - Build mapping of old refs to new local paths for update step
         #   - Log skipped non-PDF datasheets
         #   - Log when existing files are preserved due to being newer
+        #   - Log any errors encountered during copy/download operations
         
         return copied_count
     
@@ -219,15 +234,25 @@ class DataSheetLocalizer(BaseLocalizer):
         self.log("info", f"Downloading datasheet from: {url}")
         
         # TODO: Implement URL download logic
+        # Log: Starting download attempt
         # Verify URL ends with .pdf (case-insensitive) before downloading
+        # Log: URL validation result
         # Check if dest_path already exists
+        # Log: Destination file exists or not
         # If exists, get HTTP Last-Modified header from URL and compare with local file date
+        # Log: Remote file date vs local file date
         # Only download if remote file is newer or local file doesn't exist
+        # Log: Decision to download or skip based on date comparison
         # Use urllib.request or requests library to download file
+        # Log: Download progress or status
         # Handle HTTP errors gracefully (404, timeouts, etc.)
+        # Log: Any HTTP errors encountered (error code and message)
         # Verify file was downloaded successfully
+        # Log: File size and download completion
         # Check if downloaded file is a valid PDF (magic bytes)
+        # Log: PDF validation result
         # Log when existing file is preserved due to being newer
+        # Log: Final success or failure status
         
         return False
     
@@ -247,10 +272,16 @@ class DataSheetLocalizer(BaseLocalizer):
         self.log("info", f"Updating datasheet references in: {symbol_lib_path}")
         
         # TODO: Implement symbol library update logic
+        # Log: Starting reference update process
         # Read symbol library content
+        # Log: Number of symbols in library
         # Replace old datasheet references with ${KIPRJMOD}/Datasheets/... paths
+        # Log: Each reference being updated (old path -> new path)
         # Create backup before modifying
+        # Log: Backup creation status
         # Write updated content back to file
+        # Log: File write success
+        # Log: Total number of references updated
         
         return False
     

@@ -51,6 +51,7 @@ echo Creating release directory structure...
 mkdir "%RELEASE_DIR%"
 mkdir "%RELEASE_DIR%\plugins"
 mkdir "%RELEASE_DIR%\plugins\resources"
+mkdir "%RELEASE_DIR%\resources"
 
 echo.
 echo Copying plugin files...
@@ -70,9 +71,17 @@ copy "plugins\metadata.json" "%RELEASE_DIR%\plugins\" > nul
 echo Copying resource files...
 if exist "plugins\resources\Bakery_Icon.png" (
     copy "plugins\resources\Bakery_Icon.png" "%RELEASE_DIR%\plugins\resources\" > nul
-    echo   - Bakery_Icon.png copied
+    echo   - plugins\resources\Bakery_Icon.png copied
 ) else (
     echo WARNING: plugins\resources\Bakery_Icon.png not found!
+)
+
+echo Copying root-level resources...
+if exist "resources\icon.png" (
+    copy "resources\icon.png" "%RELEASE_DIR%\resources\" > nul
+    echo   - resources\icon.png copied
+) else (
+    echo WARNING: resources\icon.png not found!
 )
 
 echo Copying root metadata.json (copy from plugins)...

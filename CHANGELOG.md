@@ -17,9 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Copies local PDF datasheet files to project directory
   - Only processes PDF format datasheets (.pdf extension) - non-PDF files are skipped
   - Automatic deduplication to avoid copying same datasheet multiple times
+  - Compares file modification dates when destination exists - keeps latest version
   - Creates and manages project-local datasheet library (default: "Data_Sheets")
-  - Updates datasheet references in symbols to point to local copies using ${KIPRJMOD}
+  - Updates datasheet references in schematic files (.kicad_sch) to point to local copies
+  - Updates datasheet references in symbol libraries (.kicad_sym) to point to local copies
+  - Uses ${KIPRJMOD} variable for portable paths in all updated references
+  - Comprehensive logging for all operations (downloads, copies, updates, errors)
   - Progress tracking for datasheet copy operations
+  - Automatic backup creation before modifying symbol libraries and schematics
   - GUI configuration option for customizable datasheets directory name
 - **Icon enhancement support**
   - Improved icon handling in KiCad plugin interface

@@ -27,10 +27,11 @@ git commit -m "Before Bakery localization"
 
 ## Overview
 
-Bakery is a KiCad plugin that automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures:
-- **Project portability**: No external library dependencies
+Bakery is a KiCad plugin that automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. The plugin **"bakes in"** all external dependencies, converting references from global libraries to local project files. This ensures:
+- **Project portability**: No external library dependencies - everything is baked into your project
 - **Version stability**: Libraries won't change if global libraries are updated
-- **Self-contained projects**: Everything needed is in the project folder
+- **Self-contained projects**: All files and dependencies are contained in the project folder
+- **Complete independence**: Share projects without worrying about missing libraries
 
 ## Installation
 1. Download or clone this repository

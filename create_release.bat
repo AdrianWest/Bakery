@@ -26,7 +26,9 @@ if "%~1"=="" (
 
 REM Configuration
 set VERSION=%~1
-set RELEASE_DIR=Bakery-%VERSION%
+REM Convert version dots to underscores for ZIP filename (1.0.0 -> 1_0_0)
+set ZIP_VERSION=%VERSION:.=_%
+set RELEASE_DIR=Bakery-%ZIP_VERSION%
 set ZIP_FILE=%RELEASE_DIR%.zip
 
 echo.

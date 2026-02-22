@@ -21,11 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for copying component icons to project libraries
   - Enhanced plugin icon display in KiCad menus
   - Better visual integration with KiCad UI
+  - Added root-level resources folder with icon.png for PCM display
 
 ### Changed
 - Extended S-expression parser to handle datasheet properties
 - Enhanced file handling for datasheet and icon resources
 - Updated progress tracking to include datasheet operations
+- Updated create_release.bat to include root-level resources folder in release package
+  - ZIP structure now includes both plugins/resources/ and resources/ folders
+  - Root-level resources folder contains PCM-displayable icon
 
 ## [1.0.2] - 2026-01-19
 

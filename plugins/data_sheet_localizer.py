@@ -105,9 +105,16 @@ class DataSheetLocalizer(BaseLocalizer):
         Returns list of (symbol_name, datasheet_ref) tuples. Datasheets
         in KiCad are stored in symbol definitions.
         
+        Note: In schematic files, datasheet format is:
+        (property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf")
+        
+        Multiple instances of the same component will have duplicate datasheet
+        references. This method should deduplicate URLs to avoid copying the
+        same datasheet multiple times.
+        
         @param symbol_lib_path: Path to .kicad_sym file
         
-        @return List of tuples (symbol_name, datasheet_reference)
+        @return List of tuples (symbol_name, datasheet_reference) with duplicates removed
         """
         self.log("info", f"Scanning symbol library for datasheets: {symbol_lib_path}")
         datasheets = []
@@ -118,6 +125,7 @@ class DataSheetLocalizer(BaseLocalizer):
         # Within each symbol, find (property "Datasheet" "value") entries
         # Extract symbol names and datasheet values
         # Filter out empty datasheets ("" or "~")
+        # Use a set to track unique datasheet URLs to avoid duplicates
         
         return datasheets
     
@@ -130,7 +138,9 @@ class DataSheetLocalizer(BaseLocalizer):
         @brief Copy or download datasheets to local project directory
         
         Creates datasheet directory if needed, then copies local files or
-        downloads from URLs.
+        downloads from URLs. Automatically deduplicates URLs to avoid copying
+        the same datasheet multiple times (e.g., when multiple component 
+        instances reference the same datasheet URL).
         
         @param datasheets: List of (component_name, datasheet_ref) tuples
         @param progress_callback: Optional callback for progress updates
@@ -144,14 +154,22 @@ class DataSheetLocalizer(BaseLocalizer):
             os.makedirs(self.datasheet_dir_path)
             self.log("info", f"Created datasheet directory: {self.datasheet_dir}")
         
+        # Use set to track unique datasheet URLs/paths to avoid duplicates
+        unique_datasheets = {}  # {datasheet_url: component_name}
+        for comp_name, datasheet_ref in datasheets:
+            if datasheet_ref not in unique_datasheets:
+                unique_datasheets[datasheet_ref] = comp_name
+        
+        self.log("info", f"Found {len(datasheets)} total references, {len(unique_datasheets)} unique datasheets")
+        
         copied_count = 0
         
         # TODO: Implement datasheet copying logic
-        # For each datasheet reference:
+        # For each unique datasheet reference:
         #   - Determine if it's a URL or file path
         #   - If URL: download to local directory
         #   - If local path: copy to local directory
-        #   - Generate local filename based on component name
+        #   - Generate local filename based on URL/filename
         #   - Track successful copies
         
         return copied_count

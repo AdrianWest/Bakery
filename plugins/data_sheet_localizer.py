@@ -41,7 +41,7 @@ datasheets are stored in symbol definitions, not footprints.
 @section notes_datasheet_localizer Notes
 - Scans symbol libraries for datasheet properties
 - Handles both URL downloads (http://, https://) and local file copying
-- Preserves datasheet file formats (PDF, etc.)
+- Only processes PDF format datasheets (.pdf extension) - non-PDF files are skipped
 - Updates paths to use ${KIPRJMOD} variable for portability
 - Creates organized datasheet directory structure
 - Automatically deduplicates references to avoid copying same datasheet multiple times
@@ -130,6 +130,7 @@ class DataSheetLocalizer(BaseLocalizer):
         # Within each symbol, find (property "Datasheet" "value") entries
         # Extract symbol names and datasheet values
         # Filter out empty datasheets ("" or "~")
+        # Filter out non-PDF datasheets (only process .pdf files)
         # Use a set to track unique datasheet URLs to avoid duplicates
         
         return datasheets
@@ -174,17 +175,21 @@ class DataSheetLocalizer(BaseLocalizer):
         
         # TODO: Implement datasheet copying logic
         # For each unique datasheet reference:
+        #   - Check if reference ends with .pdf (case-insensitive) - skip if not PDF
         #   - Determine if it's a URL (starts with http:// or https://) or local file path
         #   - If URL: 
+        #       * Verify URL ends with .pdf
         #       * Download PDF from internet to local directory
         #       * Extract filename from URL or generate from component name
         #       * Save to ${KIPRJMOD}/Data_Sheets/
         #   - If local file path: 
+        #       * Verify file has .pdf extension
         #       * Expand KiCad path variables (${KIPRJMOD}, etc.)
         #       * Copy file to local directory
         #       * Preserve original filename
         #   - Track successful copies/downloads
         #   - Build mapping of old refs to new local paths for update step
+        #   - Log skipped non-PDF datasheets
         
         return copied_count
     
@@ -196,6 +201,8 @@ class DataSheetLocalizer(BaseLocalizer):
         local project directory. This handles web-hosted datasheets that
         need to be downloaded for offline project portability.
         
+        Only processes URLs ending with .pdf extension - non-PDF URLs are skipped.
+        
         @param url: Internet URL to download from (e.g., "http://www.vishay.com/docs/88503/1n4001.pdf")
         @param dest_path: Destination file path in local project
         
@@ -206,10 +213,11 @@ class DataSheetLocalizer(BaseLocalizer):
         self.log("info", f"Downloading datasheet from: {url}")
         
         # TODO: Implement URL download logic
+        # Verify URL ends with .pdf (case-insensitive) before downloading
         # Use urllib.request or requests library to download file
         # Handle HTTP errors gracefully (404, timeouts, etc.)
         # Verify file was downloaded successfully
-        # Check if downloaded file is a valid PDF
+        # Check if downloaded file is a valid PDF (magic bytes)
         
         return False
     

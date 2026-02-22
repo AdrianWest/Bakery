@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated create_release.bat to include root-level resources folder in release package
   - ZIP structure now includes both plugins/resources/ and resources/ folders
   - Root-level resources folder contains PCM-displayable icon
+- **Documentation improvements**
+  - Updated README.md overview to emphasize "bakes in" concept for external dependencies
+  - Updated installation instructions with KiCad Plugin Manager and install from ZIP options
+  - Updated usage instructions to highlight icon button in toolbar
+  - Replaced text reference with actual Bakery icon image in README
 
 ## [1.0.2] - 2026-01-19
 

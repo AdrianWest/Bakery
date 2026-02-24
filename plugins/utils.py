@@ -105,7 +105,6 @@ def expand_kicad_path(path: str, project_dir: Optional[str] = None) -> str:
         expanded_path = expanded_path.replace("${KIPRJMOD}", project_dir)
     
     # Find all environment variable references
-    import re
     env_vars = re.findall(r'\$\{([^}]+)\}', expanded_path)
     
     for var in env_vars:

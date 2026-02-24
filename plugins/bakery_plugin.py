@@ -61,7 +61,7 @@ from .constants import (
 from .ui_components import BakeryLogger, ConfigDialog
 from .footprint_localizer import FootprintLocalizer
 from .symbol_localizer import SymbolLocalizer
-from .data_sheet_localizer import DatasheetLocalizer
+from .data_sheet_localizer import DataSheetLocalizer
 from .library_manager import LibraryManager
 
 
@@ -95,6 +95,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             CONFIG_SYMBOL_DIR_NAME: DEFAULT_SYMBOL_DIR_NAME,
             CONFIG_LOCAL_LIB_NAME: DEFAULT_LOCAL_LIB_NAME,
             CONFIG_MODELS_DIR_NAME: DEFAULT_MODELS_DIR_NAME,
+            CONFIG_DATASHEETS_DIR_NAME: DEFAULT_DATASHEETS_DIR_NAME,
             CONFIG_CREATE_BACKUPS: True
         }
     
@@ -212,36 +213,28 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                         f"Datasheets={self.config[CONFIG_DATASHEETS_DIR_NAME]}, "
                         f"Backups={self.config[CONFIG_CREATE_BACKUPS]}")
         
-        # Check if schematic files are locked before starting
-        self.logger.info("Checking for open schematic files...")
         import glob
         from .constants import EXTENSION_SCHEMATIC
-        schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
-        if schematic_files:
-            locked_files = []
-            for sch_file in schematic_files:
-                try:
-                    with open(sch_file, 'r+', encoding='utf-8') as f:
-                        pass
-                except (IOError, PermissionError):
-                    locked_files.append(os.path.basename(sch_file))
-            
-            if locked_files:
-                self.logger.warning(f"The following schematic file(s) are currently open: {', '.join(locked_files)}")
-                self.logger.error("Please close all schematic editors before running this plugin")
-                wx.MessageBox(
-                    f"Cannot proceed - schematic files are open:\n\n" +
-                    "\n".join(locked_files) +
-                    "\n\nPlease close the schematic editor and try again.",
-                    "Schematic Files Locked",
-                    wx.OK | wx.ICON_WARNING
-                )
-                return
-        
+
         # Create localizers
         fp_localizer = FootprintLocalizer(self.logger)
         sym_localizer = SymbolLocalizer(self.logger)
         lib_manager = LibraryManager(self.logger)
+
+        # Check if schematic files are locked before starting
+        self.logger.info("Checking for open schematic files...")
+        locked_files = fp_localizer.check_schematic_locks(project_dir)
+        if locked_files:
+            self.logger.warning(f"The following schematic file(s) are currently open: {', '.join(locked_files)}")
+            self.logger.error("Please close all schematic editors before running this plugin")
+            wx.MessageBox(
+                f"Cannot proceed - schematic files are open:\n\n" +
+                "\n".join(locked_files) +
+                "\n\nPlease close the schematic editor and try again.",
+                "Schematic Files Locked",
+                wx.OK | wx.ICON_WARNING
+            )
+            return
         
         # === FOOTPRINT LOCALIZATION ===
         
@@ -345,37 +338,37 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         # Step 11: Localize datasheets
         datasheets_processed = 0
         datasheets_files_updated = 0
-        if copied_symbols:
+
+        # Get symbol library path and schematic files regardless of whether
+        # symbols were just copied - datasheets must also run on re-runs where
+        # symbols were already localised in a previous pass.
+        symbol_lib_path = os.path.join(
+            project_dir,
+            self.config[CONFIG_SYMBOL_DIR_NAME],
+            f"{self.config[CONFIG_SYMBOL_LIB_NAME]}.kicad_sym"
+        )
+        symbol_libs = [symbol_lib_path] if os.path.exists(symbol_lib_path) else []
+        schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
+
+        datasheet_localizer = None
+        if symbol_libs or schematic_files:
             self.logger.info("Starting datasheet localization...")
-            datasheet_localizer = DatasheetLocalizer(
-                self.logger,
+            datasheet_localizer = DataSheetLocalizer(
                 project_dir,
-                self.config[CONFIG_DATASHEETS_DIR_NAME]
+                self.config[CONFIG_DATASHEETS_DIR_NAME],
+                self.logger
             )
-            
-            # Get symbol library paths
-            symbol_lib_path = os.path.join(
-                project_dir,
-                self.config[CONFIG_SYMBOL_DIR_NAME],
-                f"{self.config[CONFIG_SYMBOL_LIB_NAME]}.kicad_sym"
-            )
-            symbol_libs = [symbol_lib_path] if os.path.exists(symbol_lib_path) else []
-            
-            # Get schematic files
-            import glob
-            from .constants import EXTENSION_SCHEMATIC
-            schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
-            
+
             # Localize datasheets
             datasheets_processed, datasheets_files_updated = datasheet_localizer.localize_all_datasheets(
                 symbol_libs,
                 schematic_files
             )
-            
+
             self.logger.info(f"Datasheet localization complete: {datasheets_processed} datasheets processed, "
                            f"{datasheets_files_updated} files updated")
         else:
-            self.logger.info("No symbols copied, skipping datasheet localization")
+            self.logger.info("No symbol library or schematic files found, skipping datasheet localization")
         
         # Complete
         self.logger.set_progress(PROGRESS_COMPLETE, PROGRESS_BAR_RANGE, "Complete")
@@ -395,6 +388,8 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             all_backups.extend(fp_localizer.backup_manager.get_backups())
         if copied_symbols:
             all_backups.extend(sym_localizer.backup_manager.get_backups())
+        if datasheet_localizer:
+            all_backups.extend(datasheet_localizer.backup_manager.get_backups())
         
         if all_backups:
             self.logger.info(f"Backups created: {len(all_backups)} file(s)")

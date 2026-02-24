@@ -14,9 +14,17 @@ import sys
 import os
 import unittest
 import argparse
+from unittest.mock import MagicMock
 
 # Add parent directory to path to import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Python 3.13 removed the 'cgi' module which is imported by data_sheet_localizer.
+# Stub it globally here so all test modules load cleanly on any Python version.
+if 'cgi' not in sys.modules:
+    _cgi_stub = MagicMock()
+    _cgi_stub.parse_header.return_value = ('', {})
+    sys.modules['cgi'] = _cgi_stub
 
 
 def run_tests(verbosity=2, pattern='test_*.py', coverage=False):

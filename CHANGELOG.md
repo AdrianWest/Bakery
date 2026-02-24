@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated create_release.bat to include root-level resources folder in release package
   - ZIP structure now includes both plugins/resources/ and resources/ folders
   - Root-level resources folder contains PCM-displayable icon
+  - Added data_sheet_localizer.py to release package file list
+- Updated install.bat to include data_sheet_localizer.py in file list
 - **Documentation improvements**
   - Updated README.md overview to emphasize "bakes in" concept for external dependencies
   - Updated installation instructions with KiCad Plugin Manager and install from ZIP options
@@ -56,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Datasheet localization now runs automatically after symbol localization (Step 11)
   - Added datasheet statistics to progress logging and completion messages
   - Datasheet processing only runs when symbols are copied (since datasheets are stored in symbols)
+
+### Fixed
+- ZIP filename format in create_release.bat now uses underscores (x_y_z) instead of dots for filename while keeping version as x.y.z in JSON metadata
+- Reformatted metadata.json and plugins/metadata.json to RFC 8259 standard (removed PowerShell-style double spaces after colons, corrected indentation alignment)
 
 ## [1.0.2] - 2026-01-19
 

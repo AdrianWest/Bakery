@@ -170,8 +170,8 @@ SUCCESS_LOCALIZATION_COMPLETE = "Localization complete!"
 
 # Confirmation messages
 CONFIRM_LOCALIZATION = (
-    "This will copy all global symbols, footprints, and 3D models to local project libraries.\n\n"
-    "A backup will be created before modifying any files.\n\n"
+    "This will copy all global symbols, footprints, 3D models, and datasheets to local project libraries.\n\n"
+    "Backups will be created before modifying schematic and library files.\n\n"
     "Continue?"
 )
 

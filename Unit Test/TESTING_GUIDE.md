@@ -34,6 +34,7 @@ This runs a quick smoke test to verify the test environment is set up correctly.
 | `test_base_localizer.py` | Base localizer class | Common functionality, file locking, schematic scanning |
 | `test_footprint_localizer.py` | Footprint localization | PCB scanning, footprint copying, 3D model localization |
 | `test_symbol_localizer.py` | Symbol localization | Symbol scanning, library extraction, reference updates |
+| `test_data_sheet_localizer.py` | Datasheet localization | URL/path detection, PDF validation, scan, copy/download, reference updates, full workflow |
 | `test_ui_components.py` | UI components | Config dialog, logger window |
 | `test_bakery_plugin.py` | Main plugin | Plugin coordination, workflow |
 

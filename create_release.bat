@@ -26,7 +26,9 @@ if "%~1"=="" (
 
 REM Configuration
 set VERSION=%~1
-set RELEASE_DIR=Bakery-%VERSION%
+REM Convert version dots to underscores for ZIP filename (1.0.0 -> 1_0_0)
+set ZIP_VERSION=%VERSION:.=_%
+set RELEASE_DIR=Bakery-%ZIP_VERSION%
 set ZIP_FILE=%RELEASE_DIR%.zip
 
 echo.
@@ -51,6 +53,7 @@ echo Creating release directory structure...
 mkdir "%RELEASE_DIR%"
 mkdir "%RELEASE_DIR%\plugins"
 mkdir "%RELEASE_DIR%\plugins\resources"
+mkdir "%RELEASE_DIR%\resources"
 
 echo.
 echo Copying plugin files...
@@ -60,6 +63,7 @@ copy "plugins\base_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\constants.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\footprint_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\symbol_localizer.py" "%RELEASE_DIR%\plugins\" > nul
+copy "plugins\data_sheet_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\library_manager.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\sexpr_parser.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\ui_components.py" "%RELEASE_DIR%\plugins\" > nul
@@ -70,9 +74,17 @@ copy "plugins\metadata.json" "%RELEASE_DIR%\plugins\" > nul
 echo Copying resource files...
 if exist "plugins\resources\Bakery_Icon.png" (
     copy "plugins\resources\Bakery_Icon.png" "%RELEASE_DIR%\plugins\resources\" > nul
-    echo   - Bakery_Icon.png copied
+    echo   - plugins\resources\Bakery_Icon.png copied
 ) else (
     echo WARNING: plugins\resources\Bakery_Icon.png not found!
+)
+
+echo Copying root-level resources...
+if exist "resources\icon.png" (
+    copy "resources\icon.png" "%RELEASE_DIR%\resources\" > nul
+    echo   - resources\icon.png copied
+) else (
+    echo WARNING: resources\icon.png not found!
 )
 
 echo Copying root metadata.json (copy from plugins)...

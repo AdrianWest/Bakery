@@ -46,6 +46,7 @@ from abc import ABC
 from .constants import EXTENSION_SCHEMATIC
 from .sexpr_parser import SExpressionParser
 from .backup_manager import BackupManager
+from .utils import find_schematic_files as _util_find_schematic_files
 
 
 class BaseLocalizer(ABC):
@@ -114,7 +115,7 @@ class BaseLocalizer(ABC):
         @param project_dir: Project directory path
         @return List of locked file basenames (empty if none locked)
         """
-        schematic_files = glob.glob(os.path.join(project_dir, f"**{EXTENSION_SCHEMATIC}"), recursive=True)
+        schematic_files = glob.glob(os.path.join(project_dir, "**", f"*{EXTENSION_SCHEMATIC}"), recursive=True)
         
         locked_files = []
         for sch_file in schematic_files:
@@ -130,8 +131,7 @@ class BaseLocalizer(ABC):
         @param project_dir: Project directory path
         @return List of schematic file paths (sorted)
         """
-        schematic_files = glob.glob(os.path.join(project_dir, f"**{EXTENSION_SCHEMATIC}"), recursive=True)
-        return sorted(schematic_files)
+        return _util_find_schematic_files(project_dir)
     
     def update_schematic_file(self, sch_file: str, replacements: List[tuple], 
                              create_backup: bool = True) -> int:

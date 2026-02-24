@@ -1,5 +1,36 @@
 # Bakery - Release Notes
 
+## v1.1.0 - Datasheet Copy and Icon Enhancement (February 22, 2026)
+
+### Overview
+This release adds new functionality to copy component datasheets to the project and enhances icon handling for better visual integration.
+
+### What's New in v1.1.0
+
+#### Datasheet Localization
+- **Datasheet copying** - Automatically copies component datasheets referenced in symbols and footprints to project directory
+- **Datasheet library management** - Creates and manages project-local datasheet library
+- **Path updates** - Updates datasheet references in symbols and footprints to point to local copies
+- **Preserves datasheet organization** - Maintains original datasheet file structure when copying
+
+#### Icon Improvements
+- **Enhanced icon support** - Improved icon handling and display in KiCad plugin interface
+- **Icon localization** - Support for copying component icons to project libraries
+- **Better visual integration** - Enhanced plugin icon display in KiCad menus
+
+#### Technical Improvements
+- Additional file handling for datasheet and icon resources
+- Extended S-expression parser to handle datasheet properties
+- Improved progress tracking for datasheet operations
+
+### Installation
+Install via KiCad Plugin and Content Manager or use the install.bat script.
+
+### Upgrading from v1.0.2
+Simply install v1.1.0 through the Plugin and Content Manager, or run the install script. All settings and functionality from previous versions are preserved.
+
+---
+
 ## v1.0.2 - PCM Compliance Update (January 19, 2026)
 
 ### Overview

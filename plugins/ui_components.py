@@ -54,10 +54,11 @@ except ImportError:
 
 from .constants import (
     CONFIG_DIALOG_SIZE, CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
-    CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_CREATE_BACKUPS,
-    DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_DIR_NAME,
-    DEFAULT_MODELS_DIR_NAME, LOGGER_WINDOW_SIZE, LOG_FONT_SIZE,
-    COLOR_WARNING_BG, COLOR_ERROR_BG, PROGRESS_BAR_RANGE
+    CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
+    CONFIG_CREATE_BACKUPS, DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME,
+    DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
+    LOGGER_WINDOW_SIZE, LOG_FONT_SIZE, COLOR_WARNING_BG, COLOR_ERROR_BG,
+    PROGRESS_BAR_RANGE
 )
 from .utils import validate_library_name
 
@@ -136,6 +137,16 @@ class ConfigDialog(wx.Dialog):
         )
         main_sizer.Add(self.models_dir_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
+        # Datasheets directory name setting
+        datasheets_label = wx.StaticText(self, label="Datasheets Directory Name:")
+        main_sizer.Add(datasheets_label, 0, wx.ALL, 5)
+        
+        self.datasheets_dir_ctrl = wx.TextCtrl(
+            self, 
+            value=config.get(CONFIG_DATASHEETS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME)
+        )
+        main_sizer.Add(self.datasheets_dir_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+        
         # Backup option
         self.backup_checkbox = wx.CheckBox(self, label="Create backups before modifying files")
         self.backup_checkbox.SetValue(config.get(CONFIG_CREATE_BACKUPS, True))
@@ -168,6 +179,7 @@ class ConfigDialog(wx.Dialog):
         sym_lib_name = self.sym_lib_name_ctrl.GetValue().strip()
         sym_dir = self.sym_dir_ctrl.GetValue().strip()
         models_dir = self.models_dir_ctrl.GetValue().strip()
+        datasheets_dir = self.datasheets_dir_ctrl.GetValue().strip()
         
         if not validate_library_name(lib_name):
             wx.MessageBox(
@@ -200,8 +212,10 @@ class ConfigDialog(wx.Dialog):
                 wx.OK | wx.ICON_ERROR
             )
             return
+        
+        if not datasheets_dir.strip():
             wx.MessageBox(
-                "3D Models directory name cannot be empty",
+                "Datasheets directory name cannot be empty",
                 "Validation Error",
                 wx.OK | wx.ICON_ERROR
             )
@@ -212,6 +226,7 @@ class ConfigDialog(wx.Dialog):
         self.config[CONFIG_SYMBOL_LIB_NAME] = sym_lib_name
         self.config[CONFIG_SYMBOL_DIR_NAME] = sym_dir
         self.config[CONFIG_MODELS_DIR_NAME] = models_dir
+        self.config[CONFIG_DATASHEETS_DIR_NAME] = datasheets_dir
         self.config[CONFIG_CREATE_BACKUPS] = self.backup_checkbox.GetValue()
         
         self.EndModal(wx.ID_OK)

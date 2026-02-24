@@ -128,18 +128,30 @@ Bakery/
 
 ## Features
 
-✅ **Symbol Localization**: Automatically copies all symbols from global libraries to your project
-✅ **Footprint Localization**: Automatically copies all footprints from global libraries to your project
-✅ **3D Model Localization**: Copies associated 3D models and updates paths
-✅ **Datasheet Localization**: Downloads datasheets from internet URLs or copies local PDF files to your project; updates all references to use portable `${KIPRJMOD}` paths
-✅ **Automatic Reference Updates**: Updates PCB, schematics, and library tables
-✅ **Dual Scanning**: Scans both PCB and schematic files for complete coverage
-✅ **Backup Creation**: Creates timestamped backups before modifying files
-✅ **Progress Tracking**: Visual progress bar with step-by-step status
-✅ **Detailed Logging**: Separate panes for info, warnings, and errors
-✅ **Configurable**: Choose library names, directories, and backup options
-✅ **Path Safety**: Validates all file operations to prevent data loss
-✅ **KiCad 9 Support**: Compatible with both KiCad version 9
+   ✅ **Symbol Localization**: Automatically copies all symbols from global libraries to your project
+   
+   ✅ **Footprint Localization**: Automatically copies all footprints from global libraries to your project
+
+   ✅ **3D Model Localization**: Copies associated 3D models and updates paths
+
+   ✅ **Datasheet Localization**: Downloads datasheets from internet URLs or copies local PDF files to your project; updates all references to use portable `${KIPRJMOD}` paths
+
+   ✅ **Automatic Reference Updates**: Updates PCB, schematics, and library tables
+
+   ✅ **Dual Scanning**: Scans both PCB and schematic files for complete coverage
+
+   ✅ **Backup Creation**: Creates timestamped backups before modifying files
+
+   ✅ **Progress Tracking**: Visual progress bar with step-by-step status
+
+   ✅ **Detailed Logging**: Separate panes for info, warnings, and errors
+
+   ✅ **Configurable**: Choose library names, directories, and backup options
+
+   ✅ **Path Safety**: Validates all file operations to prevent data loss
+
+   ✅ **KiCad 9 Support**: Compatible with both KiCad version 9
+
 
 ## Requirements
 

@@ -5,8 +5,6 @@ All notable changes to the Bakery KiCad plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [1.1.0] - 2026-02-22
 
 ### Added
@@ -28,9 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - GUI configuration option for customizable datasheets directory name
 - **Icon enhancement support**
   - Improved icon handling in KiCad plugin interface
-  - Support for copying component icons to project libraries
   - Enhanced plugin icon display in KiCad menus
-  - Better visual integration with KiCad UI
   - Added root-level resources folder with icon.png for PCM display
 
 ### Changed

@@ -99,8 +99,8 @@ powershell -NoProfile -Command "$content = Get-Content '%RELEASE_DIR%\metadata.j
 powershell -NoProfile -Command "$content = Get-Content '%RELEASE_DIR%\plugins\metadata.json' -Raw; [System.IO.File]::WriteAllText('%RELEASE_DIR%\plugins\metadata.json', $content, (New-Object System.Text.UTF8Encoding $false))"
 
 echo.
-echo Creating ZIP archive...
-powershell -Command "Compress-Archive -Path '%RELEASE_DIR%\*' -DestinationPath '%ZIP_FILE%' -Force"
+echo Creating ZIP archive with Linux-compatible paths (forward slashes)...
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Add-Type -Assembly System.IO.Compression.FileSystem; $baseDir=(Resolve-Path '%RELEASE_DIR%').Path; $zipPath=[System.IO.Path]::GetFullPath('%ZIP_FILE%'); $zip=[System.IO.Compression.ZipFile]::Open($zipPath,'Create'); Get-ChildItem -Path $baseDir -Recurse -File | ForEach-Object { $entry=$_.FullName.Substring($baseDir.Length).TrimStart([char]92).Replace([char]92,'/'); [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,$_.FullName,$entry,[System.IO.Compression.CompressionLevel]::Optimal) }; $zip.Dispose()"
 
 if not exist "%ZIP_FILE%" (
     echo ERROR: Failed to create ZIP file!

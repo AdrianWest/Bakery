@@ -15,7 +15,6 @@ plugin registration with KiCad and sets up logging for debugging purposes.
 - Plugin registration is deferred to avoid loading issues during KiCad startup
 - Import errors are caught and logged for troubleshooting
 """
-import inspect
 import logging
 import os
 from pathlib import Path
@@ -38,27 +37,14 @@ logger = logging.getLogger("Bakery")
 logger.info("=" * 80)
 logger.info("Bakery plugin __init__.py loading")
 
-def __is_in_call_stack(function_name: str, module_name: str) -> bool:
-    current_stack = inspect.stack()
-    result = False
-
-    for frame_info in current_stack:
-        frame = frame_info.frame
-        if frame.f_globals.get("__name__") == module_name:
-            if function_name in frame.f_locals or function_name in frame.f_globals:
-                result = True
-                break
-
-    return result
-
-
 try:
-    if __is_in_call_stack("LoadPluginModule", "pcbnew"):
-        logger.info("Loading Bakery plugin...")
-        from .bakery_plugin import BakeryPlugin
-        BakeryPlugin().register()
-        logger.info("Bakery plugin registered successfully")
-        
+    import pcbnew
+    logger.info("Loading Bakery plugin...")
+    from .bakery_plugin import BakeryPlugin
+    BakeryPlugin().register()
+    logger.info("Bakery plugin registered successfully")
+except ImportError:
+    pass  # pcbnew not available (running outside KiCad)
 except Exception as e:
     logger.exception(f"Fatal error loading Bakery plugin: {e}")
     raise

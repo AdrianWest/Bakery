@@ -5,6 +5,42 @@ All notable changes to the Bakery KiCad plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - KiCad 10 compatibility
+
+### Added
+- **KiCad 10 support** (verified against KiCad 10.0, released 2026-03-20; the
+  SWIG `pcbnew.ActionPlugin` API this plugin uses is still present in KiCad 10 —
+  its removal is scheduled for KiCad 11).
+- **Chained library table resolution** — KiCad 10 introduced `(type "Table")`
+  library-table entries that point to another `fp-lib-table` / `sym-lib-table`.
+  Source symbol/footprint lookups now follow these chains recursively (with cycle
+  protection), so localization works on fresh KiCad 10 installs whose default
+  global tables are chained. Classic flat KiCad 8/9 tables are unaffected.
+- 9 new unit tests covering chained-table parsing and resolution.
+
+### Changed
+- Environment-variable resolution now recognises the `KICAD10_` prefix (e.g.
+  `KICAD10_FOOTPRINT_DIR`) and transparently falls back across the
+  `KICAD10_` / `KICAD9_` / `KICAD8_` / `KICAD_` variants, so paths written by any
+  supported KiCad version resolve regardless of which version is running.
+- Global library tables are now searched under the `10.0`, `9.0` and `8.0` config
+  directories (most-recent first).
+- Symbol-library generator identifier changed from `kicad_symbol_editor` to
+  `bakery` — KiCad's developer docs state third-party tools must not use the
+  `kicad_symbol_editor` identifier. Generator version reports `10.0`.
+- PCM metadata `kicad_version_max` raised to `10.99` so the KiCad 10 Plugin &
+  Content Manager will install the plugin.
+
+### Fixed
+- `expand_kicad_env_vars` generated malformed variable names (e.g.
+  `KICAD9_0_FOOTPRINT_DIR`) that never matched KiCad's real `KICAD9_*` variables;
+  it now uses the correct major-version prefixes.
+
+### Notes
+- The written `.kicad_sym` format version is intentionally left conservative
+  (`20241209`). KiCad 10 opens it without error and upgrades it on save; writing a
+  newer token would make older KiCad versions warn about a "more recent" file.
+
 ## [1.1.0] - 2026-02-22
 
 ### Added

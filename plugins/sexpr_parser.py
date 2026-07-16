@@ -44,7 +44,7 @@ from collections import OrderedDict
 from .constants import (
     SEXPR_FP_LIB_TABLE, SEXPR_LIB, SEXPR_LIB_SYMBOLS, SEXPR_SYMBOL,
     SEXPR_PROPERTY, SEXPR_FOOTPRINT, SEXPR_MODEL, SEXPR_NAME, SEXPR_URI,
-    MAX_CACHE_SIZE
+    SEXPR_TYPE, LIBRARY_TYPE_TABLE, MAX_CACHE_SIZE
 )
 
 # Maximum cache size to prevent unbounded memory growth (defined in constants)
@@ -277,27 +277,66 @@ class SExpressionParser:
                     # Found a library entry, check if it's the one we want
                     lib_entry_name = None
                     lib_entry_uri = None
-                    
+                    lib_entry_type = None
+
                     for item in node:
                         if isinstance(item, list) and len(item) >= 2:
                             if item[0] == SEXPR_NAME:
                                 lib_entry_name = item[1].strip('"')
                             elif item[0] == SEXPR_URI:
                                 lib_entry_uri = item[1].strip('"')
-                    
-                    if lib_entry_name == lib_name and lib_entry_uri:
+                            elif item[0] == SEXPR_TYPE:
+                                lib_entry_type = item[1].strip('"')
+
+                    # Only match real library entries here; chained "Table" entries
+                    # (KiCad 10+) point to other tables and are handled separately.
+                    if (lib_entry_name == lib_name and lib_entry_uri
+                            and lib_entry_type != LIBRARY_TYPE_TABLE):
                         return lib_entry_uri
-                
+
                 # Recurse into sub-lists
                 for item in node:
                     if isinstance(item, list):
                         result = search_lib(item)
                         if result:
                             return result
-            
+
             return None
-        
+
         return search_lib(sexpr)
+
+    def find_table_chains(self, sexpr: Union[List, str]) -> List[str]:
+        """
+        @brief Find URIs of chained library tables (KiCad 10 'Table' entries)
+
+        In KiCad 10 a library table may contain entries of ``(type "Table")``
+        whose ``uri`` points at another fp-lib-table / sym-lib-table that must be
+        loaded and searched as well. This returns those referenced table URIs.
+
+        @param sexpr: Parsed library table S-expression
+        @return List of table URI strings (may contain env-var placeholders)
+        """
+        chains: List[str] = []
+
+        def search(node):
+            if isinstance(node, list) and len(node) > 0:
+                if node[0] == SEXPR_LIB:
+                    entry_type = None
+                    entry_uri = None
+                    for item in node:
+                        if isinstance(item, list) and len(item) >= 2:
+                            if item[0] == SEXPR_TYPE:
+                                entry_type = item[1].strip('"')
+                            elif item[0] == SEXPR_URI:
+                                entry_uri = item[1].strip('"')
+                    if entry_type == LIBRARY_TYPE_TABLE and entry_uri:
+                        chains.append(entry_uri)
+                for item in node:
+                    if isinstance(item, list):
+                        search(item)
+
+        search(sexpr)
+        return chains
     
     def clear_cache(self):
         """

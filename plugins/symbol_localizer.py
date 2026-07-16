@@ -33,7 +33,7 @@ libraries. It parses .kicad_sch files, extracts symbol definitions from global
 .kicad_sym libraries, and creates consolidated local symbol libraries.
 
 @section notes_symbol_localizer Notes
-- Supports KiCad 8 and 9 environment variable formats
+- Supports KiCad 8, 9, and 10 environment variable formats
 - Handles both absolute and relative library paths
 - Creates backups before modifying schematic files
 """
@@ -50,15 +50,14 @@ from .constants import (
     SEXPR_URI, SEXPR_OPTIONS, SEXPR_DESCR, SEXPR_LIB, SEXPR_SYM_LIB_TABLE,
     LIBRARY_TYPE_KICAD, PROGRESS_STEP_SCAN_SYMBOLS, PROGRESS_STEP_COPY_SYMBOLS,
     PROGRESS_STEP_UPDATE_SYM_LIB_TABLE, ENV_VAR_KIPRJMOD,
-    KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK,
-    ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC,
+    KICAD_VERSIONS, ENV_VAR_PREFIX_GENERIC, ENV_VAR_PREFIXES,
     KICAD_SYMBOL_VERSION, KICAD_GENERATOR_NAME, KICAD_GENERATOR_VERSION,
     LIB_SYMBOLS_METADATA_COUNT
 )
 from .base_localizer import BaseLocalizer
 from .utils import (
     expand_kicad_path, safe_read_file, find_schematic_files,
-    scan_schematics_for_items
+    scan_schematics_for_items, resolve_library_uri
 )
 
 
@@ -308,48 +307,41 @@ class SymbolLocalizer(BaseLocalizer):
         @return Absolute path to .kicad_sym file or None if not found
         """
         try:
-            # Try common locations for global sym-lib-table
-            possible_table_paths = [
-                os.path.join(os.environ.get('APPDATA', ''), 'kicad', KICAD_VERSION_PRIMARY, 
-                            EXTENSION_SYM_LIB_TABLE),
-                os.path.join(os.environ.get('USERPROFILE', ''), 'Documents', 'KiCad', 
-                            KICAD_VERSION_PRIMARY, EXTENSION_SYM_LIB_TABLE),
-                os.path.join(os.path.expanduser('~'), '.config', 'kicad', 
-                            KICAD_VERSION_PRIMARY, EXTENSION_SYM_LIB_TABLE),
-            ]
-            
-            # Also try fallback version
-            for base_path in list(possible_table_paths):
-                fallback_path = base_path.replace(KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK)
-                possible_table_paths.append(fallback_path)
-            
+            # Try common locations for global sym-lib-table across supported
+            # KiCad config directory versions (10.0, 9.0, 8.0), most-recent first.
+            possible_table_paths = []
+            for version in KICAD_VERSIONS:
+                possible_table_paths.extend([
+                    os.path.join(os.environ.get('APPDATA', ''), 'kicad', version,
+                                EXTENSION_SYM_LIB_TABLE),
+                    os.path.join(os.environ.get('USERPROFILE', ''), 'Documents', 'KiCad',
+                                version, EXTENSION_SYM_LIB_TABLE),
+                    os.path.join(os.path.expanduser('~'), '.config', 'kicad',
+                                version, EXTENSION_SYM_LIB_TABLE),
+                ])
+
             sym_lib_table_path = None
             for path in possible_table_paths:
                 if os.path.exists(path):
                     sym_lib_table_path = path
                     break
-            
+
             if not sym_lib_table_path:
                 return None
-            
-            # Read and parse the sym-lib-table file
-            with open(sym_lib_table_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Parse S-expression
-            sexpr = self.parser.parse(content)
-            
-            # Find library path
-            lib_path = self.parser.find_library_path(sexpr, lib_name)
-            
+
+            # Resolve the nickname, following KiCad 10 chained "Table" tables.
+            lib_path = resolve_library_uri(
+                self.parser, sym_lib_table_path, lib_name,
+                self.expand_path, self.logger)
+
             if not lib_path:
                 return None
-            
+
             # Expand environment variables
             expanded_path = self.expand_path(lib_path)
-            
+
             return expanded_path
-                    
+
         except Exception as e:
             return None
     
@@ -361,26 +353,32 @@ class SymbolLocalizer(BaseLocalizer):
         @return Expanded path
         """
         import re
-        
+
         expanded_path = path
-        
+
         # Find all environment variables
         env_vars = re.findall(r'\$\{([^}]+)\}', path)
-        
+
         for var in env_vars:
             env_value = os.environ.get(var, "")
-            
-            # If KiCad 9 variable not found, try KiCad 8 equivalent
-            if not env_value and var.startswith(ENV_VAR_PREFIX_PRIMARY):
-                kicad8_var = var.replace(ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK)
-                env_value = os.environ.get(kicad8_var, "")
-            
-            # Also try without version number
+
+            # If a version-specific KiCad variable (KICAD10_/KICAD9_/KICAD8_) is
+            # not set, try the other supported version prefixes, then the
+            # version-less generic name.
             if not env_value:
-                generic_var = var.replace(ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_GENERIC).replace(
-                    ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC)
-                env_value = os.environ.get(generic_var, "")
-            
+                match = re.match(r'^KICAD\d+_(.*)$', var)
+                if match:
+                    var_base = match.group(1)
+                    for prefix in ENV_VAR_PREFIXES:
+                        alt_var = f"{prefix}{var_base}"
+                        if alt_var == var:
+                            continue
+                        env_value = os.environ.get(alt_var, "")
+                        if env_value:
+                            break
+                    if not env_value:
+                        env_value = os.environ.get(f"{ENV_VAR_PREFIX_GENERIC}{var_base}", "")
+
             if env_value:
                 expanded_path = expanded_path.replace(f"${{{var}}}", env_value)
         

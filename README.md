@@ -53,10 +53,11 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 ### Option 3: Manual Installation
 
 1. Download or clone this repository
-2. Copy the `plugins` folder contents to your KiCad plugins directory:
-   - **Windows**: `%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\Bakery\`
-   - **Linux**: `~/.kicad/9.0/scripting/plugins/Bakery/`
-   - **macOS**: `~/Library/Preferences/kicad/9.0/scripting/plugins/Bakery/`
+2. Copy the `plugins` folder contents to your KiCad plugins directory
+   (replace `10.0` with `9.0` or `8.0` to match your KiCad version):
+   - **Windows**: `%USERPROFILE%\Documents\KiCad\10.0\scripting\plugins\Bakery\`
+   - **Linux**: `~/.kicad/10.0/scripting/plugins/Bakery/`
+   - **macOS**: `~/Library/Preferences/kicad/10.0/scripting/plugins/Bakery/`
 3. Restart KiCad
 
 ## Usage
@@ -150,12 +151,12 @@ Bakery/
 
    ✅ **Path Safety**: Validates all file operations to prevent data loss
 
-   ✅ **KiCad 9 Support**: Compatible with both KiCad version 9
+   ✅ **KiCad 8/9/10 Support**: Compatible with KiCad 8, 9, and 10 (primary target: KiCad 10)
 
 
 ## Requirements
 
-- KiCad 9.0 or later
+- KiCad 8.0 or later (KiCad 10 recommended)
 - Python 3.x (bundled with KiCad)
 - wxPython (bundled with KiCad)
 
@@ -210,7 +211,7 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 
 ### Unit Tests
 
-Run the comprehensive unit test suite (232 tests covering all modules):
+Run the comprehensive unit test suite (241 tests covering all modules):
 
 ```bash
 cd "Unit Test"
@@ -221,8 +222,8 @@ python run_tests.py --list       # List all available tests
 ```
 
 **Test Coverage:**
-- ✅ 232 tests across 11 test modules
-- ✅ All modules covered: constants, utils, sexpr_parser, backup_manager, library_manager, base_localizer, footprint_localizer, symbol_localizer, data_sheet_localizer, ui_components, bakery_plugin
+- ✅ 241 tests across 12 test modules
+- ✅ All modules covered: constants, utils, sexpr_parser, backup_manager, library_manager, base_localizer, footprint_localizer, symbol_localizer, data_sheet_localizer, ui_components, bakery_plugin, plus KiCad 10 chained-table resolution
 - ✅ 0 failures, 0 errors, 0 skipped
 
 See [Unit Test/README.md](Unit%20Test/README.md) for detailed testing documentation.

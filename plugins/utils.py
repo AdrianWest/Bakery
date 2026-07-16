@@ -33,13 +33,13 @@ schematic file discovery, and library table management functions.
 @section notes_utils Notes
 - All file operations include error handling
 - Path validation prevents directory traversal attacks
-- Supports both KiCad 8 and 9 environment variable formats
+- Supports KiCad 8, 9, and 10 environment variable formats
 """
 
 import os
 import re
 from typing import Optional
-from .constants import MAX_FILE_SIZE_BYTES
+from .constants import MAX_FILE_SIZE_BYTES, ENV_VAR_PREFIXES, ENV_VAR_PREFIX_GENERIC
 
 
 # Maximum file size to read into memory (50MB)
@@ -94,22 +94,42 @@ def expand_kicad_path(path: str, project_dir: Optional[str] = None) -> str:
     
     Supports common KiCad environment variables including:
     - ${KIPRJMOD} - Project directory
-    - ${KICAD9_*} - KiCad 9.x variables  
+    - ${KICAD10_*} - KiCad 10.x variables
+    - ${KICAD9_*} - KiCad 9.x variables
     - ${KICAD8_*} - KiCad 8.x variables
     - ${KICAD_*} - Generic KiCad variables
     """
     expanded_path = path
-    
+
     # Handle ${KIPRJMOD}
     if project_dir and "${KIPRJMOD}" in expanded_path:
         expanded_path = expanded_path.replace("${KIPRJMOD}", project_dir)
-    
+
     # Find all environment variable references
     env_vars = re.findall(r'\$\{([^}]+)\}', expanded_path)
-    
+
     for var in env_vars:
         # Try to get the environment variable value
         env_value = os.environ.get(var)
+
+        # If a version-specific KiCad variable isn't set under the running
+        # KiCad version, fall back to the other supported version prefixes and
+        # finally the version-less generic name. This makes paths written by
+        # any KiCad version (8/9/10) resolvable.
+        if not env_value:
+            match = re.match(r'^KICAD\d+_(.*)$', var)
+            if match:
+                var_base = match.group(1)
+                for prefix in ENV_VAR_PREFIXES:
+                    alt_var = f"{prefix}{var_base}"
+                    if alt_var == var:
+                        continue
+                    env_value = os.environ.get(alt_var)
+                    if env_value:
+                        break
+                if not env_value:
+                    env_value = os.environ.get(f"{ENV_VAR_PREFIX_GENERIC}{var_base}")
+
         if env_value:
             expanded_path = expanded_path.replace(f"${{{var}}}", env_value)
     
@@ -141,6 +161,71 @@ def safe_read_file(path: str, encoding: str = 'utf-8', max_size: Optional[int] =
     
     with open(path, 'r', encoding=encoding) as f:
         return f.read()
+
+
+def resolve_library_uri(parser, table_path, lib_name, expand_path,
+                        logger=None, _visited=None):
+    """
+    @brief Resolve a library nickname to its URI from a KiCad library table
+
+    Reads and parses the fp-lib-table / sym-lib-table at ``table_path`` and looks
+    up ``lib_name``. KiCad 10 introduced chained tables: an entry of
+    ``(type "Table")`` points to another table file. This function follows those
+    chains recursively (with cycle protection) so nicknames defined in a chained
+    table still resolve. Works transparently with the classic flat tables used by
+    KiCad 8/9.
+
+    @param parser: SExpressionParser instance
+    @param table_path: Filesystem path to the library table file
+    @param lib_name: Library nickname to resolve
+    @param expand_path: Callable that expands ${ENV_VAR} placeholders in a path
+    @param logger: Optional logger object with info/warning/error methods
+    @param _visited: Internal set of already-visited table paths (cycle guard)
+    @return Raw library URI string (still containing any env-var placeholders)
+            or None if the nickname was not found in this table or its chains
+    """
+    def log(level, msg):
+        if logger:
+            method = getattr(logger, level, None)
+            if method:
+                method(msg)
+
+    if _visited is None:
+        _visited = set()
+
+    real_path = os.path.realpath(table_path)
+    if real_path in _visited:
+        return None  # Already processed this table - avoid chain cycles
+    _visited.add(real_path)
+
+    try:
+        with open(table_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except OSError as e:
+        log('warning', f"Could not read library table {table_path}: {e}")
+        return None
+
+    sexpr = parser.parse(content)
+
+    # Direct match in this table (classic KiCad-type entry)
+    uri = parser.find_library_path(sexpr, lib_name)
+    if uri:
+        return uri
+
+    # Follow KiCad 10 chained "Table" entries
+    for chain_uri in parser.find_table_chains(sexpr):
+        chain_path = expand_path(chain_uri)
+        if not os.path.isabs(chain_path):
+            # Relative table URIs are resolved against the parent table's folder
+            chain_path = os.path.join(os.path.dirname(table_path), chain_path)
+        if os.path.exists(chain_path):
+            log('info', f"Following chained library table: {chain_path}")
+            result = resolve_library_uri(parser, chain_path, lib_name,
+                                         expand_path, logger, _visited)
+            if result:
+                return result
+
+    return None
 
 
 def find_schematic_files(project_dir: str) -> list:

@@ -39,6 +39,7 @@ to maintain consistency and simplify maintenance.
 - Update PLUGIN_VERSION when releasing new versions
 - UI strings support future internationalization
 - KiCad version compatibility handled via environment variable mappings
+- Supports KiCad 8, 9, and 10 (primary target: KiCad 10)
 """
 
 
@@ -86,9 +87,18 @@ BYTES_PER_MB = 1024 * 1024
 MAX_CACHE_SIZE = 100
 
 # KiCad file format version
+# This is deliberately kept at a conservative value. KiCad (including 10.x) reads
+# older symbol-library format versions and silently upgrades them on save, so this
+# opens without error everywhere. Writing a *newer* token than the running KiCad
+# would instead trigger a "created by a more recent version" warning, so we do NOT
+# bump this to the latest (e.g. KiCad 10 master is already 20260629). Symbols are
+# copied verbatim from the source libraries, so their individual definitions keep
+# whatever format the installed KiCad produced.
 KICAD_SYMBOL_VERSION = '20241209'
-KICAD_GENERATOR_NAME = 'kicad_symbol_editor'
-KICAD_GENERATOR_VERSION = '9.0'
+# KiCad's developer docs state that third-party tools must NOT identify themselves
+# as 'kicad_symbol_editor'; use a tool-specific generator name instead.
+KICAD_GENERATOR_NAME = 'bakery'
+KICAD_GENERATOR_VERSION = '10.0'
 
 # Library file structure offset
 LIB_SYMBOLS_METADATA_COUNT = 4  # version, generator, generator_version fields plus kicad_symbol_lib tag
@@ -110,14 +120,21 @@ EXTENSION_FP_LIB_TABLE = "fp-lib-table"
 EXTENSION_SYM_LIB_TABLE = "sym-lib-table"
 
 # KiCad version compatibility
-KICAD_VERSION_PRIMARY = "9.0"
-KICAD_VERSION_FALLBACK = "8.0"
-KICAD_VERSIONS = [KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK]
+# KiCad keeps its per-version config directory (fp-lib-table, sym-lib-table, etc.)
+# under a "MAJOR.0" folder, e.g. .../KiCad/10.0/. These are tried most-recent first.
+KICAD_VERSION_PRIMARY = "10.0"
+KICAD_VERSION_FALLBACK = "9.0"
+KICAD_VERSIONS = ["10.0", "9.0", "8.0"]
 
 # Environment variables
-ENV_VAR_PREFIX_PRIMARY = "KICAD9_"
-ENV_VAR_PREFIX_FALLBACK = "KICAD8_"
+# KiCad names its version-specific path variables using the MAJOR version only
+# (e.g. KICAD10_FOOTPRINT_DIR, KICAD9_FOOTPRINT_DIR, KICAD8_FOOTPRINT_DIR).
+ENV_VAR_PREFIX_PRIMARY = "KICAD10_"
+ENV_VAR_PREFIX_FALLBACK = "KICAD9_"
 ENV_VAR_PREFIX_GENERIC = "KICAD_"
+# All version-specific prefixes to try, most-recent first, when resolving a
+# KiCad path variable. Keeps the plugin working across KiCad 8/9/10 installs.
+ENV_VAR_PREFIXES = ["KICAD10_", "KICAD9_", "KICAD8_"]
 ENV_VAR_KIPRJMOD = "KIPRJMOD"
 
 # Common KiCad environment variables
@@ -147,6 +164,9 @@ SEXPR_LIB_ID = "lib_id"
 
 # Library type
 LIBRARY_TYPE_KICAD = "KiCad"
+# KiCad 10 introduced chained library tables: an entry of this type points (via its
+# uri) to another fp-lib-table / sym-lib-table that must be loaded and searched too.
+LIBRARY_TYPE_TABLE = "Table"
 
 # Progress tracking
 PROGRESS_STEP_SCAN_PCB = "Scanning PCB"

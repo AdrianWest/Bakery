@@ -171,7 +171,7 @@ cp -r Bakery ~/Library/Preferences/kicad/9.0/scripting/plugins/
 - `backup_manager.py` - File backup handling
 - `constants.py` - Configuration constants
 - `Bakery_Icon.png` - Plugin icon (24x24px)
-- `metadata.json` - Plugin metadata for KiCad 9.0+ Plugin Manager
+- `metadata.json` - Plugin metadata for KiCad 10.0+ Plugin Manager
 ```
 
 ## Integration Points
@@ -212,7 +212,7 @@ cp -r Bakery ~/Library/Preferences/kicad/9.0/scripting/plugins/
 
 ---
 
-**KiCad Version Compatibility**: Currently targeting KiCad 8.0+. API may differ in older versions
+**KiCad Version Compatibility**: Currently targeting KiCad 10.0+ only. This plugin does not discover or run against KiCad 8/9 installations at runtime.
 - **Schematics**: `.kicad_sch` (S-expression, contains symbol references)
 - **PCB**: `.kicad_pcb` (S-expression, contains footprint references)
 - **Symbol libraries**: Can be in project or global locations

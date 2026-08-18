@@ -33,25 +33,27 @@ entries, resolving library paths from global tables, and expanding KiCad
 environment variables.
 
 @section notes_library_manager Notes
-- Supports both KiCad 8 and 9 environment variable naming conventions
-- Handles ${KIPRJMOD}, ${KICAD8_3DMODEL_DIR}, ${KICAD_3DMODEL_DIR}
+- Supports KiCad 10 environment variable naming conventions; normalizes
+  legacy KICAD9_* tokens found in project files as input migration only
+- Handles ${KIPRJMOD}, ${KICAD10_3DMODEL_DIR}, ${KICAD_3DMODEL_DIR}
 - Validates library paths before operations
 """
 
 import os
-import re
 from typing import Dict, Optional, Callable
 
 from .constants import (
-    KICAD_VERSIONS, ENV_VAR_KIPRJMOD, ENV_VAR_PREFIX_PRIMARY,
-    ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC, EXTENSION_FOOTPRINT_LIB,
-    EXTENSION_FP_LIB_TABLE, SEXPR_FP_LIB_TABLE, SEXPR_LIB, SEXPR_NAME,
-    SEXPR_TYPE, SEXPR_URI, SEXPR_OPTIONS, SEXPR_DESCR, LIBRARY_TYPE_KICAD,
-    KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK, KICAD_ENV_FOOTPRINT_DIR,
+    ENV_VAR_KIPRJMOD, ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_GENERIC,
+    EXTENSION_FOOTPRINT_LIB, EXTENSION_FP_LIB_TABLE, SEXPR_FP_LIB_TABLE,
+    SEXPR_LIB, SEXPR_NAME, SEXPR_TYPE, SEXPR_URI, SEXPR_OPTIONS, SEXPR_DESCR,
+    LIBRARY_TYPE_KICAD, KICAD_VERSION_PRIMARY, KICAD_ENV_FOOTPRINT_DIR,
     KICAD_ENV_3DMODEL_DIR, KICAD_ENV_SYMBOL_DIR
 )
 from .sexpr_parser import SExpressionParser
-from .utils import validate_library_name, validate_path_safety, expand_kicad_path
+from .utils import (
+    validate_library_name, validate_path_safety, expand_kicad_path,
+    KicadPathResolutionError, get_kicad_table_paths
+)
 
 
 class LibraryManager:
@@ -114,14 +116,12 @@ class LibraryManager:
         ]
         
         for var_base in var_names:
-            # Try version-specific variables first
-            for version in KICAD_VERSIONS:
-                var_name = f"KICAD{version.replace('.', '_')}_{var_base}"
-                value = os.environ.get(var_name)
-                if value:
-                    expanded[var_name] = value
-                    self.log('info', f"Found ${{{var_name}}} = {value}")
-                    break
+            # Try the KiCad 10 version-specific variable first
+            var_name = f"{ENV_VAR_PREFIX_PRIMARY}{var_base}"
+            value = os.environ.get(var_name)
+            if value:
+                expanded[var_name] = value
+                self.log('info', f"Found ${{{var_name}}} = {value}")
             
             # Also try generic version
             generic_var = f"{ENV_VAR_PREFIX_GENERIC}{var_base}"
@@ -135,51 +135,16 @@ class LibraryManager:
     def expand_path(self, path: str) -> str:
         """
         @brief Expand environment variables in a path
-        
+
+        Delegates to the single shared resolver in utils.py so footprints,
+        symbols, 3D models, and datasheets all resolve paths identically.
+
         @param path: Path with ${VAR_NAME} placeholders
         @return Expanded path
+
+        @throws KicadPathResolutionError if a variable cannot be resolved
         """
-        expanded_path = path
-        
-        # Find all environment variables
-        env_vars = re.findall(r'\$\{([^}]+)\}', path)
-        
-        for var in env_vars:
-            # Check our cached expanded variables first
-            if var in self.env_vars:
-                expanded_path = expanded_path.replace(f"${{{var}}}", self.env_vars[var])
-                continue
-            
-            # Try direct environment lookup
-            env_value = os.environ.get(var, "")
-            
-            # If KiCad 9 variable not found, try KiCad 8 equivalent
-            if not env_value and var.startswith(ENV_VAR_PREFIX_PRIMARY):
-                kicad8_var = var.replace(ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK)
-                env_value = os.environ.get(kicad8_var, "")
-                if env_value:
-                    self.log('info', f"Using ${{{kicad8_var}}} as fallback")
-            
-            # Also try without version number
-            if not env_value:
-                generic_var = var.replace(ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_GENERIC).replace(
-                    ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC)
-                env_value = os.environ.get(generic_var, "")
-                if env_value:
-                    self.log('info', f"Using ${{{generic_var}}} as fallback")
-            
-            if env_value:
-                expanded_path = expanded_path.replace(f"${{{var}}}", env_value)
-                # Cache for future use
-                self.env_vars[var] = env_value
-            else:
-                self.log('warning', f"Environment variable ${{{var}}} not found")
-        
-        # Handle file:// URIs
-        if expanded_path.startswith("file://"):
-            expanded_path = expanded_path[7:]
-        
-        return expanded_path
+        return expand_kicad_path(path)
     
     def create_local_footprint_library(self, project_dir: str, lib_name: str) -> str:
         """
@@ -217,56 +182,54 @@ class LibraryManager:
             self.log('error', f"Failed to create library directory: {e}")
             raise
     
-    def find_footprint_library_path(self, lib_name: str) -> Optional[str]:
+    def find_footprint_library_path(self, lib_name: str, project_dir: Optional[str] = None) -> Optional[str]:
         """
         @brief Find the filesystem path to a footprint library
         
         @param lib_name: Library nickname
+        @param project_dir: Optional project directory whose table takes precedence
         @return Absolute path to .pretty folder or None if not found
         """
         try:
-            # Try common locations for global fp-lib-table
-            possible_table_paths = [
-                os.path.join(os.environ.get('APPDATA', ''), 'kicad', KICAD_VERSION_PRIMARY, 
-                            EXTENSION_FP_LIB_TABLE),
-                os.path.join(os.environ.get('USERPROFILE', ''), 'Documents', 'KiCad', 
-                            KICAD_VERSION_PRIMARY, EXTENSION_FP_LIB_TABLE),
-                os.path.join(os.path.expanduser('~'), '.config', 'kicad', 
-                            KICAD_VERSION_PRIMARY, EXTENSION_FP_LIB_TABLE),
-            ]
+            # Use the active project/configuration tables first.
+            possible_table_paths = get_kicad_table_paths(EXTENSION_FP_LIB_TABLE, project_dir)
             
-            # Also try fallback version
-            for base_path in list(possible_table_paths):
-                fallback_path = base_path.replace(KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK)
-                possible_table_paths.append(fallback_path)
-            
-            fp_lib_table_path = None
-            for path in possible_table_paths:
-                if os.path.exists(path):
-                    fp_lib_table_path = path
-                    self.log('info', f"Found fp-lib-table: {path}")
-                    break
-            
-            if not fp_lib_table_path:
-                self.log('warning', "Could not find global fp-lib-table")
+            visited_tables = set()
+
+            def find_in_table(table_path: str) -> Optional[str]:
+                if table_path in visited_tables or not os.path.exists(table_path):
+                    return None
+                visited_tables.add(table_path)
+                self.log('info', f"Checking fp-lib-table: {table_path}")
+                with open(table_path, 'r', encoding='utf-8') as f:
+                    table_sexpr = self.parser.parse(f.read())
+                found = self.parser.find_library_path(table_sexpr, lib_name)
+                if found:
+                    return found
+                delegate_uri = self.parser.find_library_path(table_sexpr, "KiCad")
+                if delegate_uri:
+                    try:
+                        return find_in_table(self.expand_path(delegate_uri))
+                    except KicadPathResolutionError as e:
+                        self.log('warning', f"Could not resolve delegated fp-lib-table: {e}")
                 return None
-            
-            # Read and parse the fp-lib-table file
-            with open(fp_lib_table_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Parse S-expression
-            sexpr = self.parser.parse(content)
-            
-            # Find library path
-            lib_path = self.parser.find_library_path(sexpr, lib_name)
+
+            lib_path = None
+            for table_path in possible_table_paths:
+                lib_path = find_in_table(table_path)
+                if lib_path:
+                    break
             
             if not lib_path:
                 self.log('warning', f"Library '{lib_name}' not found in fp-lib-table")
                 return None
             
             # Expand environment variables
-            expanded_path = self.expand_path(lib_path)
+            try:
+                expanded_path = self.expand_path(lib_path)
+            except KicadPathResolutionError as e:
+                self.log('warning', f"Could not resolve path for '{lib_name}': {e}")
+                return None
             
             self.log('info', f"Resolved {lib_name} to {expanded_path}")
             

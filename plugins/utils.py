@@ -33,17 +33,45 @@ schematic file discovery, and library table management functions.
 @section notes_utils Notes
 - All file operations include error handling
 - Path validation prevents directory traversal attacks
-- Supports both KiCad 8 and 9 environment variable formats
+- Runtime resolution supports KiCad 10 (KICAD10_*) path variables only.
+  Legacy KICAD9_* tokens found in existing project files are normalized to
+  the KICAD10_* equivalent as input migration; KiCad 8/9 installations are
+  never discovered or read from at runtime.
 """
 
 import os
 import re
 from typing import Optional
-from .constants import MAX_FILE_SIZE_BYTES
+from .constants import MAX_FILE_SIZE_BYTES, ENV_VAR_PREFIX_PRIMARY, LEGACY_ENV_VAR_PREFIXES
 
 
 # Maximum file size to read into memory (50MB)
 MAX_FILE_SIZE = MAX_FILE_SIZE_BYTES
+
+
+def get_kicad_table_paths(table_name: str, project_dir: Optional[str] = None) -> list:
+    """
+    @brief Return KiCad library-table candidates in project/configuration order
+
+    @param table_name: Table filename, such as fp-lib-table or sym-lib-table
+    @param project_dir: Optional project directory whose table takes precedence
+    @return Ordered list of candidate table paths
+    """
+    candidates = []
+    if project_dir:
+        candidates.append(os.path.join(project_dir, table_name))
+
+    config_home = os.environ.get('KICAD_CONFIG_HOME')
+    if config_home:
+        candidates.append(os.path.join(config_home, '10.0', table_name))
+
+    candidates.extend([
+        os.path.join(os.environ.get('APPDATA', ''), 'kicad', '10.0', table_name),
+        os.path.join(os.environ.get('USERPROFILE', ''), 'Documents', 'KiCad', '10.0', table_name),
+        os.path.join(os.path.expanduser('~'), '.config', 'kicad', '10.0', table_name),
+        os.path.join(os.path.expanduser('~'), 'Library', 'Preferences', 'kicad', '10.0', table_name),
+    ])
+    return list(dict.fromkeys(candidates))
 
 
 def validate_library_name(name: str) -> bool:
@@ -84,6 +112,73 @@ def validate_path_safety(path: str, project_dir: str) -> bool:
         return False
 
 
+class KicadPathResolutionError(Exception):
+    """
+    @brief Raised when a KiCad path variable cannot be resolved to a concrete path
+
+    Callers must catch this at the localization boundary, log the unresolved
+    variable, surface it through the existing warning/error UI, and skip only
+    the affected asset rather than using a partially-expanded or literal
+    "${VAR}" path.
+    """
+    def __init__(self, path: str, variable: str):
+        self.path = path
+        self.variable = variable
+        super().__init__(f"Could not resolve KiCad path variable '${{{variable}}}' in path: {path}")
+
+
+def _normalize_legacy_kicad_var(var_name: str) -> str:
+    """
+    @brief Normalize a legacy versioned KiCad path-variable name to the KICAD10_* equivalent
+
+    This is input-token normalization only (e.g. for KICAD9_* tokens found in
+    existing project files); it never triggers a lookup of an older KiCad
+    installation's environment or configuration.
+
+    @param var_name: Raw variable name found inside ${...}
+    @return Normalized KICAD10_* variable name, or var_name unchanged if not legacy
+    """
+    for legacy_prefix in LEGACY_ENV_VAR_PREFIXES:
+        if var_name.startswith(legacy_prefix):
+            return ENV_VAR_PREFIX_PRIMARY + var_name[len(legacy_prefix):]
+    return var_name
+
+
+def _expand_via_kicad_native_api(var_name: str) -> Optional[str]:
+    """
+    @brief Tier-2 resolver: ask KiCad's own path-expansion API
+
+    Used for values configured only in KiCad's Configure Paths dialog, which
+    are internal to KiCad and not guaranteed to exist in os.environ. Returns
+    None (rather than raising) if pcbnew is unavailable or the variable is
+    still unresolved, so the caller can fall through to the failure contract.
+
+    @param var_name: Normalized (KICAD10_*) variable name
+    @return Expanded value, or None if unavailable
+    """
+    try:
+        import pcbnew
+    except ImportError:
+        return None
+
+    try:
+        project = None
+        try:
+            board = pcbnew.GetBoard()
+            project = board.GetProject() if board else None
+        except Exception:
+            project = None
+
+        token = f"${{{var_name}}}"
+        expanded = str(pcbnew.ExpandEnvVarSubstitutions(token, project))
+        if expanded and expanded != token:
+            return expanded
+    except Exception:
+        pass
+
+    return None
+
+
 def expand_kicad_path(path: str, project_dir: Optional[str] = None) -> str:
     """
     @brief Expand KiCad environment variables in path
@@ -91,12 +186,18 @@ def expand_kicad_path(path: str, project_dir: Optional[str] = None) -> str:
     @param path: Path with potential environment variables
     @param project_dir: Optional project directory for ${KIPRJMOD}
     @return Expanded path
-    
-    Supports common KiCad environment variables including:
-    - ${KIPRJMOD} - Project directory
-    - ${KICAD9_*} - KiCad 9.x variables  
-    - ${KICAD8_*} - KiCad 8.x variables
-    - ${KICAD_*} - Generic KiCad variables
+
+    @throws KicadPathResolutionError if a non-KIPRJMOD variable cannot be
+            resolved through any tier. Never returns a path that still
+            contains an unresolved "${...}" reference.
+
+    Resolution order for each ${VAR} (matching KiCad's documented precedence):
+    1. ${KIPRJMOD} is expanded directly from project_dir if supplied.
+    2. Legacy versioned tokens (e.g. ${KICAD9_FOOTPRINT_DIR}) are normalized
+       to the KICAD10_* equivalent.
+    3. An explicitly set os.environ value (KiCad's documented override).
+    4. KiCad's native path-expansion API, for values set only in Configure Paths.
+    5. KicadPathResolutionError, if still unresolved.
     """
     expanded_path = path
     
@@ -104,14 +205,25 @@ def expand_kicad_path(path: str, project_dir: Optional[str] = None) -> str:
     if project_dir and "${KIPRJMOD}" in expanded_path:
         expanded_path = expanded_path.replace("${KIPRJMOD}", project_dir)
     
-    # Find all environment variable references
+    # Find all remaining environment variable references
     env_vars = re.findall(r'\$\{([^}]+)\}', expanded_path)
     
     for var in env_vars:
-        # Try to get the environment variable value
-        env_value = os.environ.get(var)
+        if var == "KIPRJMOD":
+            # No project_dir was supplied; KIPRJMOD is not a global lookup failure.
+            continue
+
+        normalized_var = _normalize_legacy_kicad_var(var)
+
+        env_value = os.environ.get(normalized_var) or os.environ.get(var)
+
+        if not env_value:
+            env_value = _expand_via_kicad_native_api(normalized_var)
+
         if env_value:
             expanded_path = expanded_path.replace(f"${{{var}}}", env_value)
+        else:
+            raise KicadPathResolutionError(path, var)
     
     # Handle file:// URIs
     if expanded_path.startswith("file://"):

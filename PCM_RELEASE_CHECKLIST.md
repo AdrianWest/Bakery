@@ -5,8 +5,8 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
 ## Pre-Release Preparation
 
 - [ ] **Complete all testing**
-  - Test on Windows with KiCad 9.0
-  - Test on Linux with KiCad 9.0 (if possible)
+  - Test on Windows with KiCad 10.0
+  - Test on Linux with KiCad 10.0 (if possible)
   - Test with various project types (simple and complex)
   - Verify all features work correctly
   - Fix any remaining bugs

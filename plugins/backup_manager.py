@@ -59,13 +59,15 @@ class BackupManager:
     - backups (list): List of created backup file paths
     """
     
-    def __init__(self, logger: Optional[Callable] = None):
+    def __init__(self, logger: Optional[Callable] = None, enabled: bool = False):
         """
         @brief Initialize backup manager
         
         @param logger: Optional logger object
+        @param enabled: Whether backup creation is allowed
         """
         self.logger = logger
+        self.enabled = enabled
         self.backups = []
     
     def log(self, level: str, message: str) -> None:
@@ -84,6 +86,10 @@ class BackupManager:
         
         @throws IOError if backup fails
         """
+        if not self.enabled:
+            self.log('info', f"Backup creation disabled; skipping backup for: {filepath}")
+            return None
+
         try:
             if not os.path.exists(filepath):
                 self.log('warning', f"File not found for backup: {filepath}")

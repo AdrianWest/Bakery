@@ -66,7 +66,6 @@ class TestBakeryLogger(unittest.TestCase):
         self.assertIsInstance(LOG_FONT_SIZE, int)
         self.assertGreater(LOG_FONT_SIZE, 0)
 
-
 class TestUIComponentsModule(unittest.TestCase):
     """Test module-level functionality"""
     

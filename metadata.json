@@ -25,14 +25,14 @@
                        ],
     "versions":  [
                      {
-                         "version":  "1.1.0",
+                         "version":  "2.0.0",
                          "status":  "stable",
                          "kicad_version":  "9.0",
                          "kicad_version_max":  "9.99",
-                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v1.1.0/Bakery-1_1_0.zip",
-                         "download_sha256":  "0e6db5156b050b251d86b3118ebfdab76f9f127bddbc2b4f3ac2f66d0a4c3b77",
-                         "download_size":  53370,
-                         "install_size":  192033
+                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v2.0.0/Bakery-2_0_0.zip",
+                         "download_sha256":  "6210d48505981f9a7ab73ebc5db3a23893baa9c1d6dcc392a2f4ed260a5d949c",
+                         "download_size":  58143,
+                         "install_size":  206952
                      },
                      {
                          "version":  "1.0.2",
@@ -41,6 +41,16 @@
                          "kicad_version_max":  "9.99",
                          "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v1.0.2/Bakery-1.0.2.zip",
                          "download_sha256":  "e0c77c94d5a858aa5dc3383362dd1a4dda8384cc08c95124656e7ffb16c57d25",
+                         "download_size":  41468,
+                         "install_size":  151268
+                     },
+                     {
+                         "version":  "2.0.0",
+                         "status":  "stable",
+                         "kicad_version":  "10.0",
+                         "kicad_version_max":  "10.99",
+                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v2.0.0/Bakery-2_0_0.zip",
+                         "download_sha256":  "replace_with_actual_sha256_for_v2.0.0",
                          "download_size":  41468,
                          "install_size":  151268
                      }

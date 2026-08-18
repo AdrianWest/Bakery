@@ -6,6 +6,7 @@ Tests the main BakeryPlugin ActionPlugin class.
 
 import sys
 import os
+import types
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 
@@ -88,6 +89,70 @@ class TestBakeryPlugin(unittest.TestCase):
         library_manager = import_bakery_module('library_manager')
         self.assertIsNotNone(library_manager)
         self.assertTrue(hasattr(library_manager, 'LibraryManager'))
+
+    def test_plugin_defaults_disable_backups(self):
+        """Test that backup creation is off by default for the plugin config."""
+        constants = import_bakery_module('constants')
+
+        class FakeActionPlugin:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        class FakeDialog:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def ShowModal(self, *args, **kwargs):
+                return 1
+
+            def Destroy(self, *args, **kwargs):
+                pass
+
+            def EndModal(self, *args, **kwargs):
+                return None
+
+        class FakeFrame(FakeDialog):
+            pass
+
+        wx_stub = types.SimpleNamespace(
+            Dialog=FakeDialog,
+            Frame=FakeFrame,
+            MessageBox=lambda *args, **kwargs: None,
+            ID_OK=1,
+            ID_CANCEL=2,
+            ICON_WARNING=0,
+            ICON_ERROR=0,
+            ICON_QUESTION=0,
+            ICON_INFORMATION=0,
+            YES=1,
+            NO=2,
+            GetApp=lambda: types.SimpleNamespace(Yield=lambda: None),
+            BoxSizer=lambda *args, **kwargs: types.SimpleNamespace(Add=lambda *a, **k: None),
+            VERTICAL=0,
+            HORIZONTAL=1,
+            ALL=0,
+            EXPAND=0,
+            LEFT=0,
+            RIGHT=0,
+            BOTTOM=0,
+            ALIGN_CENTER=0,
+            StaticText=lambda *args, **kwargs: types.SimpleNamespace(GetFont=lambda: types.SimpleNamespace(SetStyle=lambda *a, **k: None, SetFont=lambda *a, **k: None)),
+            TextCtrl=lambda *args, **kwargs: types.SimpleNamespace(GetValue=lambda: '', SetValue=lambda *a, **k: None),
+            Button=lambda *args, **kwargs: types.SimpleNamespace(Bind=lambda *a, **k: None),
+            EVT_BUTTON=None,
+            FONTSTYLE_ITALIC=0,
+            SetSizer=lambda *a, **k: None,
+            Centre=lambda *a, **k: None,
+            CheckBox=lambda *args, **kwargs: types.SimpleNamespace(SetValue=lambda *a, **k: None, GetValue=lambda: False),
+        )
+
+        cgi_stub = MagicMock()
+        cgi_stub.parse_header.return_value = ('', {})
+        with patch.dict(sys.modules, {'pcbnew': types.SimpleNamespace(ActionPlugin=FakeActionPlugin), 'wx': wx_stub, 'cgi': cgi_stub}):
+            sys.modules.pop('Bakery.bakery_plugin', None)
+            plugin_module = import_bakery_module('bakery_plugin')
+            plugin = plugin_module.BakeryPlugin()
+            self.assertFalse(plugin.config[constants.CONFIG_CREATE_BACKUPS])
 
 
 if __name__ == '__main__':

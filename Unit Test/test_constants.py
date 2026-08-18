@@ -99,23 +99,29 @@ class TestConstants(unittest.TestCase):
         self.assertIsInstance(constants.KICAD_VERSIONS, list)
         self.assertGreater(len(constants.KICAD_VERSIONS), 0)
     
-    def test_kicad_version_compatibility(self):
-        """Test that primary and fallback versions are in KICAD_VERSIONS"""
-        self.assertIn(constants.KICAD_VERSION_PRIMARY, constants.KICAD_VERSIONS)
-        self.assertIn(constants.KICAD_VERSION_FALLBACK, constants.KICAD_VERSIONS)
+    def test_kicad_version_is_kicad10(self):
+        """Test that Bakery targets KiCad 10 only, with no runtime fallback version"""
+        self.assertEqual(constants.KICAD_VERSION_PRIMARY, "10.0")
+        self.assertEqual(constants.KICAD_VERSIONS, [constants.KICAD_VERSION_PRIMARY])
+        self.assertFalse(hasattr(sys.modules['constants'], 'KICAD_VERSION_FALLBACK'))
     
     def test_env_var_prefixes_defined(self):
         """Test that environment variable prefixes are defined"""
         self.assertTrue(hasattr(sys.modules['constants'], 'ENV_VAR_PREFIX_PRIMARY'))
-        self.assertTrue(hasattr(sys.modules['constants'], 'ENV_VAR_PREFIX_FALLBACK'))
         self.assertTrue(hasattr(sys.modules['constants'], 'ENV_VAR_PREFIX_GENERIC'))
         self.assertTrue(hasattr(sys.modules['constants'], 'ENV_VAR_KIPRJMOD'))
+        self.assertEqual(constants.ENV_VAR_PREFIX_PRIMARY, "KICAD10_")
+        self.assertFalse(hasattr(sys.modules['constants'], 'ENV_VAR_PREFIX_FALLBACK'))
     
     def test_env_var_prefixes_end_with_underscore(self):
         """Test that environment variable prefixes end with underscore"""
         self.assertTrue(constants.ENV_VAR_PREFIX_PRIMARY.endswith('_'))
-        self.assertTrue(constants.ENV_VAR_PREFIX_FALLBACK.endswith('_'))
         self.assertTrue(constants.ENV_VAR_PREFIX_GENERIC.endswith('_'))
+    
+    def test_legacy_env_var_prefixes_are_input_only(self):
+        """Test that legacy KICAD9_ tokens are defined only for input normalization"""
+        self.assertIn("KICAD9_", constants.LEGACY_ENV_VAR_PREFIXES)
+        self.assertNotIn("KICAD8_", constants.LEGACY_ENV_VAR_PREFIXES)
     
     def test_backup_timestamp_format_valid(self):
         """Test that backup timestamp format is valid strftime format"""

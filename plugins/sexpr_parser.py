@@ -42,12 +42,19 @@ for symbol libraries and symbol definitions to maintain KiCad's expected formatt
 from typing import List, Union, Any, Optional
 from collections import OrderedDict
 from .constants import (
-    SEXPR_FP_LIB_TABLE, SEXPR_LIB, SEXPR_LIB_SYMBOLS, SEXPR_SYMBOL,
+    SEXPR_FP_LIB_TABLE, SEXPR_SYM_LIB_TABLE, SEXPR_LIB, SEXPR_LIB_SYMBOLS, SEXPR_SYMBOL,
     SEXPR_PROPERTY, SEXPR_FOOTPRINT, SEXPR_MODEL, SEXPR_NAME, SEXPR_URI,
     MAX_CACHE_SIZE
 )
 
 # Maximum cache size to prevent unbounded memory growth (defined in constants)
+
+
+class SExpressionParseError(Exception):
+    """!
+    @brief Raised when S-expression text is malformed (e.g. an unmatched closing parenthesis)
+    """
+    pass
 
 
 class SExpressionParser:
@@ -140,6 +147,10 @@ class SExpressionParser:
                 if current_token:
                     stack[-1].append(current_token.strip())
                     current_token = ""
+                if len(stack) <= 1:
+                    raise SExpressionParseError(
+                        f"Unmatched closing parenthesis at position {i}"
+                    )
                 completed = stack.pop()
                 stack[-1].append(completed)
             elif char in ' \t\n\r':
@@ -172,9 +183,9 @@ class SExpressionParser:
             if len(sexpr) == 0:
                 return "()"
             
-            # Special formatting for top-level tables
-            if sexpr[0] == SEXPR_FP_LIB_TABLE:
-                parts = [f'({SEXPR_FP_LIB_TABLE}']
+            # Special formatting for top-level library tables
+            if sexpr[0] in (SEXPR_FP_LIB_TABLE, SEXPR_SYM_LIB_TABLE):
+                parts = [f'({sexpr[0]}']
                 for item in sexpr[1:]:
                     if isinstance(item, list):
                         parts.append('\n  ' + self.to_string(item, indent + 2))
@@ -185,7 +196,7 @@ class SExpressionParser:
             elif sexpr[0] == SEXPR_LIB:
                 parts = [f'({SEXPR_LIB}']
                 for item in sexpr[1:]:
-                    parts.append(self.to_string(item, indent))
+                    parts.append(' ' + self.to_string(item, indent))
                 parts.append(')')
                 return ''.join(parts)
             

@@ -10,7 +10,7 @@ import os
 import unittest
 import tempfile
 import shutil
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 
 # Use import helper for modules with relative imports
 from import_helper import import_bakery_module
@@ -152,6 +152,93 @@ class TestFootprintLocalizer(unittest.TestCase):
         
         # Test that method exists
         self.assertTrue(hasattr(self.localizer, 'update_pcb_references'))
+
+    def test_reload_footprints_from_library(self):
+        """Test reloading footprints while preserving board state and pad nets"""
+        local_lib_path = os.path.join(self.project_dir, "MyLib.pretty")
+        os.makedirs(local_lib_path)
+
+        old_net = Mock()
+        old_pad = Mock()
+        old_pad.GetNumber.return_value = "1"
+        old_pad.GetNet.return_value = old_net
+
+        old_fpid = Mock()
+        old_fpid.GetLibItemName.return_value = "R_0805"
+        old_footprint = Mock()
+        old_footprint.GetFPID.return_value = old_fpid
+        old_footprint.GetReference.return_value = "R1"
+        old_footprint.IsFlipped.return_value = False
+        old_footprint.GetFields.return_value = []
+        old_footprint.GetFieldsText.return_value = {}
+        old_footprint.Pads.return_value = [old_pad]
+
+        new_pad = Mock()
+        new_pad.GetNumber.return_value = "1"
+        new_footprint = Mock()
+        new_footprint.GetFields.return_value = []
+        new_footprint.Pads.return_value = [new_pad]
+
+        mock_board = Mock()
+        mock_board.GetFootprints.return_value = [old_footprint]
+        mock_pcbnew = MagicMock()
+        mock_pcbnew.FootprintLoad.return_value = new_footprint
+
+        with patch.dict(sys.modules, {'pcbnew': mock_pcbnew}):
+            result = self.localizer.reload_footprints_from_library(
+                mock_board,
+                self.project_dir,
+                "MyLib"
+            )
+
+        self.assertEqual(result, (1, 0))
+        mock_pcbnew.FootprintLoad.assert_called_once_with(
+            local_lib_path,
+            "R_0805",
+            False
+        )
+        new_footprint.SetPosition.assert_called_once_with(
+            old_footprint.GetPosition.return_value
+        )
+        new_footprint.SetOrientation.assert_called_once_with(
+            old_footprint.GetOrientation.return_value
+        )
+        new_pad.SetNet.assert_called_once_with(old_net)
+        mock_board.Add.assert_called_once_with(new_footprint)
+        mock_board.Remove.assert_called_once_with(old_footprint)
+        mock_board.BuildConnectivity.assert_called_once_with()
+
+    def test_update_pcb_model_paths_rewrites_embedded_models(self):
+        """Test rewriting localized model paths in the saved PCB"""
+        pcb_file = os.path.join(self.project_dir, "test.kicad_pcb")
+        old_path = (
+            "${KICAD10_3DMODEL_DIR}/Capacitor_SMD.3dshapes/"
+            "CP_Elec_18x17.5.step"
+        )
+        new_path = "${KIPRJMOD}/3D Models/CP_Elec_18x17.5.step"
+        missing_path = (
+            "${KICAD10_3DMODEL_DIR}/Button_Switch_THT.3dshapes/"
+            "KSA_Tactile_SPST.step"
+        )
+        with open(pcb_file, 'w', encoding='utf-8') as pcb:
+            pcb.write(
+                f'(footprint "MyLib:CP_Elec_18x17.5"\n'
+                f'  (model "{old_path}"))\n'
+                f'(footprint "MyLib:CP_Elec_18x17.5"\n'
+                f'  (model "{old_path}"))\n'
+                f'(footprint "MyLib:KSA_Tactile_SPST"\n'
+                f'  (model "{missing_path}"))\n'
+            )
+        self.localizer.copied_models = {old_path: new_path}
+
+        updated_count = self.localizer.update_pcb_model_paths(pcb_file)
+
+        with open(pcb_file, 'r', encoding='utf-8') as pcb:
+            updated_content = pcb.read()
+        self.assertEqual(updated_count, 2)
+        self.assertNotIn(old_path, updated_content)
+        self.assertEqual(updated_content.count(new_path), 2)
+        self.assertIn(missing_path, updated_content)
     
     def test_update_schematic_references(self):
         """Test updating schematic footprint references"""

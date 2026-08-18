@@ -31,7 +31,7 @@ by coordinating FootprintLocalizer, SymbolLocalizer, and LibraryManager componen
 
 @section notes_bakery_plugin Notes
 - Registered as KiCad ActionPlugin via pcbnew.ActionPlugin interface
-- Requires KiCad 8.0 or later
+- Requires KiCad 10.0 or later
 - Must be installed in KiCad's scripting/plugins directory
 """
 
@@ -96,7 +96,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             CONFIG_LOCAL_LIB_NAME: DEFAULT_LOCAL_LIB_NAME,
             CONFIG_MODELS_DIR_NAME: DEFAULT_MODELS_DIR_NAME,
             CONFIG_DATASHEETS_DIR_NAME: DEFAULT_DATASHEETS_DIR_NAME,
-            CONFIG_CREATE_BACKUPS: True
+            CONFIG_CREATE_BACKUPS: False
         }
     
     def defaults(self):
@@ -132,7 +132,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                     wx.OK | wx.ICON_WARNING
                 )
                 return
-            
+
             # Get project path
             project_path = board.GetFileName()
             if not project_path:
@@ -369,6 +369,21 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                            f"{datasheets_files_updated} files updated")
         else:
             self.logger.info("No symbol library or schematic files found, skipping datasheet localization")
+
+        fp_localizer.reload_footprints_from_library(
+            board,
+            project_dir,
+            self.config[CONFIG_LOCAL_LIB_NAME]
+        )
+        
+        # Persist the final in-memory board state after all localization steps.
+        try:
+            board.Save(project_path)
+            self.logger.info("Final PCB save completed successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to save final PCB state: {e}")
+            raise
+        fp_localizer.update_pcb_model_paths(project_path)
         
         # Complete
         self.logger.set_progress(PROGRESS_COMPLETE, PROGRESS_BAR_RANGE, "Complete")

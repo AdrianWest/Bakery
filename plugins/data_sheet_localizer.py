@@ -59,7 +59,9 @@ from urllib.parse import urlparse, unquote
 
 from .constants import ENV_VAR_KIPRJMOD
 from .base_localizer import BaseLocalizer
-from .utils import expand_kicad_path, safe_read_file
+from .utils import (
+    expand_kicad_path, safe_read_file, validate_path_safety, KicadPathResolutionError
+)
 
 
 class DataSheetLocalizer(BaseLocalizer):
@@ -99,11 +101,15 @@ class DataSheetLocalizer(BaseLocalizer):
         @param project_dir: Path to the project directory
         @param datasheet_dir: Name of the local datasheet directory (default: "Data_Sheets")
         @param logger: Optional logger object with info/warning/error methods
+
+        @throws ValueError if datasheet_dir resolves outside project_dir
         """
         super().__init__(logger)
         self.project_dir = project_dir
         self.datasheet_dir = datasheet_dir
         self.datasheet_dir_path = os.path.join(project_dir, datasheet_dir)
+        if not validate_path_safety(self.datasheet_dir_path, project_dir):
+            raise ValueError(f"Datasheets directory name is unsafe: {datasheet_dir}")
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -347,6 +353,9 @@ class DataSheetLocalizer(BaseLocalizer):
                 filename = os.path.basename(datasheet_ref)
             
             dest_path = os.path.join(self.datasheet_dir_path, filename)
+            if not validate_path_safety(dest_path, self.datasheet_dir_path):
+                self.log("error", f"Skipping unsafe datasheet destination path: {filename}")
+                continue
             new_ref = f"${{{ENV_VAR_KIPRJMOD}}}/{self.datasheet_dir}/{filename}"
             
             if is_url:
@@ -361,7 +370,11 @@ class DataSheetLocalizer(BaseLocalizer):
                 self.log("info", f"Identified as local file copy: {filename}")
                 
                 # Expand KiCad path variables
-                expanded_path = expand_kicad_path(datasheet_ref, self.project_dir)
+                try:
+                    expanded_path = expand_kicad_path(datasheet_ref, self.project_dir)
+                except KicadPathResolutionError as e:
+                    self.log("error", f"Could not resolve datasheet path: {e}")
+                    continue
                 self.log("info", f"Source path: {expanded_path}")
                 
                 if not os.path.exists(expanded_path):
@@ -432,9 +445,14 @@ class DataSheetLocalizer(BaseLocalizer):
                     _, params = cgi.parse_header(disposition)
                     cd_name = params.get('filename', '')
                     if cd_name:
-                        if not cd_name.lower().endswith('.pdf'):
-                            cd_name += '.pdf'
-                        return cd_name
+                        # Server-supplied name: strip any directory components
+                        # (both separators, since headers aren't OS-specific) to
+                        # prevent it from escaping the datasheet directory.
+                        cd_name = os.path.basename(cd_name.replace('\\', '/'))
+                        if cd_name and cd_name not in ('.', '..'):
+                            if not cd_name.lower().endswith('.pdf'):
+                                cd_name += '.pdf'
+                            return cd_name
 
                 # Content-Type is PDF or ambiguous - proceed with fallback name
                 return fallback_filename
@@ -577,12 +595,15 @@ class DataSheetLocalizer(BaseLocalizer):
             self.log("info", f"No datasheet references needed updating in this {file_type}")
             return True
         
-        # Create backup before modifying
-        self.log("info", f"Creating backup before modifying {file_type}")
-        if not self.backup_manager.create_backup(file_path):
-            self.log("warning", f"Failed to create backup for: {file_path}")
+        # Create backup before modifying only when backups are enabled.
+        if self.backup_manager.enabled:
+            self.log("info", f"Creating backup before modifying {file_type}")
+            if not self.backup_manager.create_backup(file_path):
+                self.log("warning", f"Failed to create backup for: {file_path}")
+            else:
+                self.log("info", "Backup created successfully")
         else:
-            self.log("info", "Backup created successfully")
+            self.log("info", f"Backup creation disabled; skipping backup for: {file_path}")
         
         # Write updated content back to file
         try:

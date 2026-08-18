@@ -1,5 +1,28 @@
 # Bakery - Release Notes
 
+## v2.0.0 - KiCad 10 Support and Backup Policy Update
+
+### Overview
+This release targets KiCad 10 and removes the automatic backup option from the plugin configuration. It also fixes the false warning that appeared while processing datasheet updates.
+
+### What's New in v2.0.0
+- **KiCad 10 support** - Updated for KiCad 10 project structure and plugin behavior.
+- **No automatic backups** - The configuration dialog no longer includes a backup checkbox, and the plugin does not create backups during localization.
+- **False warning fixed** - The warning message about failed backup creation no longer appears when backup creation has intentionally been disabled.
+- **Datasheet copies remain active** - Datasheets still copy to the project-local `Data_Sheets` folder and references are updated to use `${KIPRJMOD}`.
+- **Git-first safety** - The recommended recovery workflow is to use Git or an external version-control/backup process before running the plugin.
+
+### Refactored Areas in v2.0.0
+- **Plugin entry and configuration** - Refined the main plugin flow and cleaned up the configuration dialog in `bakery_plugin.py` and `ui_components.py`.
+- **Backup policy** - Moved backup handling to a single no-backup default path across `backup_manager.py` and `base_localizer.py`.
+- **Datasheet localization flow** - Updated the datasheet update path in `data_sheet_localizer.py` to avoid false backup warnings while continuing to copy files locally.
+- **Constants and messaging** - Simplified the plugin messages and config defaults in `constants.py` to match the KiCad 10 behavior and the no-backup policy.
+- **Library update logic** - Kept the footprint/symbol localization pipeline aligned with the current KiCad 10 project layout and library table behaviors.
+
+> Note: This release supports a KiCad 10 project that still references 9.x global libraries. Bakery will localize those 9.x library references into the project without requiring the project to be rebuilt from scratch or converted away from its current KiCad 10 format.
+
+---
+
 ## v1.1.0 - Datasheet Copy and Icon Enhancement (February 22, 2026)
 
 ### Overview

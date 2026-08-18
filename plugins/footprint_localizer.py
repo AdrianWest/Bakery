@@ -459,24 +459,25 @@ class FootprintLocalizer(BaseLocalizer):
         # global model paths. Rebuild mappings from source/destination
         # footprints and the project-local model folder so PCB references are
         # repaired without copying files again.
-        if not self.copied_models:
-            local_models = {}
-            for entry in os.listdir(models_dir):
-                if os.path.isfile(os.path.join(models_dir, entry)):
-                    local_models[entry] = f"${{{ENV_VAR_KIPRJMOD}}}/{models_dir_name}/{entry}"
-            
-            for lib_name, fp_name, source_fp_path, dest_fp_path in copied_footprints:
-                source_models = self.extract_3d_models(source_fp_path, fp_name) or []
-                dest_models = self.extract_3d_models(dest_fp_path, fp_name) or []
-                for source_path, dest_path in zip(source_models, dest_models):
-                    if dest_path.startswith(f'${{{ENV_VAR_KIPRJMOD}}}/'):
-                        model_name = os.path.basename(dest_path.replace('\\', '/'))
-                        if model_name in local_models:
-                            self.copied_models[source_path] = dest_path
-                            if source_path.startswith('${KICAD10_'):
-                                self.copied_models[source_path.replace('${KICAD10_', '${KICAD9_', 1)] = dest_path
-                            if source_path.startswith('${KICAD9_'):
-                                self.copied_models[source_path.replace('${KICAD9_', '${KICAD10_', 1)] = dest_path
+        local_models = {}
+        for entry in os.listdir(models_dir):
+            if os.path.isfile(os.path.join(models_dir, entry)):
+                local_models[entry] = f"${{{ENV_VAR_KIPRJMOD}}}/{models_dir_name}/{entry}"
+
+        for lib_name, fp_name, source_fp_path, dest_fp_path in copied_footprints:
+            source_models = self.extract_3d_models(source_fp_path, fp_name) or []
+            dest_models = self.extract_3d_models(dest_fp_path, fp_name) or []
+            for source_path, dest_path in zip(source_models, dest_models):
+                if dest_path.startswith(f'${{{ENV_VAR_KIPRJMOD}}}/'):
+                    model_name = os.path.basename(dest_path.replace('\\', '/'))
+                    if model_name in local_models:
+                        self.copied_models.setdefault(source_path, dest_path)
+                        if source_path.startswith('${KICAD10_'):
+                            legacy_path = source_path.replace('${KICAD10_', '${KICAD9_', 1)
+                            self.copied_models.setdefault(legacy_path, dest_path)
+                        if source_path.startswith('${KICAD9_'):
+                            normalized_path = source_path.replace('${KICAD9_', '${KICAD10_', 1)
+                            self.copied_models.setdefault(normalized_path, dest_path)
         
         # Summary
         if total_models > 0:

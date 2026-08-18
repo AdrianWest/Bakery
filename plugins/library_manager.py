@@ -132,7 +132,7 @@ class LibraryManager:
         
         return expanded
     
-    def expand_path(self, path: str) -> str:
+    def expand_path(self, path: str, project_dir: Optional[str] = None) -> str:
         """
         @brief Expand environment variables in a path
 
@@ -144,7 +144,7 @@ class LibraryManager:
 
         @throws KicadPathResolutionError if a variable cannot be resolved
         """
-        return expand_kicad_path(path)
+        return expand_kicad_path(path, project_dir)
     
     def create_local_footprint_library(self, project_dir: str, lib_name: str) -> str:
         """
@@ -209,7 +209,7 @@ class LibraryManager:
                 delegate_uri = self.parser.find_library_path(table_sexpr, "KiCad")
                 if delegate_uri:
                     try:
-                        return find_in_table(self.expand_path(delegate_uri))
+                        return find_in_table(self.expand_path(delegate_uri, project_dir))
                     except KicadPathResolutionError as e:
                         self.log('warning', f"Could not resolve delegated fp-lib-table: {e}")
                 return None
@@ -226,7 +226,7 @@ class LibraryManager:
             
             # Expand environment variables
             try:
-                expanded_path = self.expand_path(lib_path)
+                expanded_path = self.expand_path(lib_path, project_dir)
             except KicadPathResolutionError as e:
                 self.log('warning', f"Could not resolve path for '{lib_name}': {e}")
                 return None

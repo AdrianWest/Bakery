@@ -162,6 +162,11 @@ class SExpressionParser:
             
             i += 1
         
+        if len(stack) != 1:
+            raise SExpressionParseError(
+                "Unmatched opening parenthesis in expression"
+            )
+
         result = stack[0][0] if stack[0] else []
         
         # Cache result

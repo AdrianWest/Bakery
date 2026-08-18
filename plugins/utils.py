@@ -215,7 +215,7 @@ def expand_kicad_path(path: str, project_dir: Optional[str] = None) -> str:
 
         normalized_var = _normalize_legacy_kicad_var(var)
 
-        env_value = os.environ.get(normalized_var) or os.environ.get(var)
+        env_value = os.environ.get(normalized_var)
 
         if not env_value:
             env_value = _expand_via_kicad_native_api(normalized_var)

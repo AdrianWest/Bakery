@@ -154,7 +154,7 @@ Bakery/
 
 ## Requirements
 
-- KiCad 10.0 or later
+- KiCad 10.x
 - Python 3.x (bundled with KiCad)
 - wxPython (bundled with KiCad)
 

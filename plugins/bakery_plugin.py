@@ -370,12 +370,6 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         else:
             self.logger.info("No symbol library or schematic files found, skipping datasheet localization")
 
-        fp_localizer.reload_footprints_from_library(
-            board,
-            project_dir,
-            self.config[CONFIG_LOCAL_LIB_NAME]
-        )
-        
         # Persist the final in-memory board state after all localization steps.
         try:
             board.Save(project_path)

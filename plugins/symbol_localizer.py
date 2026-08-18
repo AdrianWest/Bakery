@@ -368,7 +368,7 @@ class SymbolLocalizer(BaseLocalizer):
                 delegate_uri = self.parser.find_library_path(table_sexpr, "KiCad")
                 if delegate_uri:
                     try:
-                        return find_in_table(expand_kicad_path(delegate_uri))
+                        return find_in_table(expand_kicad_path(delegate_uri, project_dir))
                     except KicadPathResolutionError as e:
                         self.log('warning', f"Could not resolve delegated sym-lib-table: {e}")
                 return None
@@ -384,7 +384,7 @@ class SymbolLocalizer(BaseLocalizer):
             
             # Expand environment variables
             try:
-                expanded_path = self.expand_path(lib_path)
+                expanded_path = self.expand_path(lib_path, project_dir)
             except KicadPathResolutionError:
                 return None
             
@@ -393,7 +393,7 @@ class SymbolLocalizer(BaseLocalizer):
         except Exception as e:
             return None
     
-    def expand_path(self, path: str) -> str:
+    def expand_path(self, path: str, project_dir: Optional[str] = None) -> str:
         """
         @brief Expand environment variables in a path
 
@@ -405,7 +405,7 @@ class SymbolLocalizer(BaseLocalizer):
 
         @throws KicadPathResolutionError if a variable cannot be resolved
         """
-        return expand_kicad_path(path)
+        return expand_kicad_path(path, project_dir)
     
     def write_symbol_library(self, lib_path: str, lib_name: str, 
                             symbol_contents: List[list], existing_symbols: Set[str]):

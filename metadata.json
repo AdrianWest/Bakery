@@ -25,14 +25,14 @@
                        ],
     "versions":  [
                      {
-                         "version":  "2.0.0",
+                         "version":  "1.1.0",
                          "status":  "stable",
                          "kicad_version":  "9.0",
                          "kicad_version_max":  "9.99",
-                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v2.0.0/Bakery-1_0_0.zip",
-                         "download_sha256":  "f2a7831a1abc516c010e255ec22f025cf33f966d484afdef77fa47f993656fde",
-                         "download_size":  58156,
-                         "install_size":  207085
+                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/v1.1.0/Bakery-1_1_0.zip",
+                         "download_sha256":  "0e6db5156b050b251d86b3118ebfdab76f9f127bddbc2b4f3ac2f66d0a4c3b77",
+                         "download_size":  53370,
+                         "install_size":  192033
                      },
                      {
                          "version":  "1.0.2",

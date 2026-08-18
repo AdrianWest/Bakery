@@ -192,26 +192,6 @@ class TestBaseLocalizer(unittest.TestCase):
             self.assertIn("NewLib", updated_content)
             self.assertNotIn("OldLib", updated_content)
     
-    def test_update_schematic_file_with_backup(self):
-        """Test updating schematic file with backup creation"""
-        sch_file = os.path.join(self.project_dir, "test.kicad_sch")
-        original_content = '(kicad_sch (symbol (lib_id "OldLib:Symbol")))'
-        
-        with open(sch_file, 'w') as f:
-            f.write(original_content)
-        
-        # Define replacements list
-        replacements = [("OldLib", "NewLib")]
-        
-        # Update with backup
-        result = self.localizer.update_schematic_file(
-            sch_file, replacements, create_backup=True
-        )
-        
-        if result:
-            # Should have created a backup
-            self.assertGreater(len(self.localizer.backup_manager.backups), 0)
-    
     def test_replace_references_in_content(self):
         """Test replacing references in S-expression content"""
         content = '(symbol (lib_id "Device:R") (value "10k"))'

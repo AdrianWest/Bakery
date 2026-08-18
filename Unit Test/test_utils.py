@@ -17,6 +17,7 @@ utils = import_bakery_module('utils')
 validate_library_name = utils.validate_library_name
 validate_path_safety = utils.validate_path_safety
 expand_kicad_path = utils.expand_kicad_path
+KicadPathResolutionError = utils.KicadPathResolutionError
 safe_read_file = utils.safe_read_file
 find_schematic_files = utils.find_schematic_files
 scan_schematics_for_items = utils.scan_schematics_for_items
@@ -129,8 +130,7 @@ class TestExpandKicadPath(unittest.TestCase):
     def setUp(self):
         """Set up test environment variables"""
         self.original_env = os.environ.copy()
-        os.environ['KICAD9_FOOTPRINT_DIR'] = '/kicad9/footprints'
-        os.environ['KICAD8_FOOTPRINT_DIR'] = '/kicad8/footprints'
+        os.environ['KICAD10_FOOTPRINT_DIR'] = '/kicad10/footprints'
         os.environ['KICAD_FOOTPRINT_DIR'] = '/kicad/footprints'
     
     def tearDown(self):
@@ -146,17 +146,26 @@ class TestExpandKicadPath(unittest.TestCase):
         result = expand_kicad_path(path, project_dir)
         self.assertEqual(os.path.normpath(result), expected)
     
-    def test_expand_kicad9_variable(self):
-        """Test expansion of KICAD9_ prefixed variables"""
+    def test_expand_kicad10_variable(self):
+        """Test expansion of KICAD10_ prefixed variables"""
+        path = "${KICAD10_FOOTPRINT_DIR}/Resistor_SMD.pretty"
+        result = expand_kicad_path(path)
+        self.assertIn('/kicad10/footprints', result)
+    
+    def test_expand_legacy_kicad9_variable_normalizes_to_kicad10(self):
+        """Test that a legacy ${KICAD9_*} token normalizes to the KICAD10_* value"""
         path = "${KICAD9_FOOTPRINT_DIR}/Resistor_SMD.pretty"
         result = expand_kicad_path(path)
-        self.assertIn('/kicad9/footprints', result)
+        self.assertIn('/kicad10/footprints', result)
     
-    def test_expand_kicad8_variable(self):
-        """Test expansion of KICAD8_ prefixed variables"""
-        path = "${KICAD8_FOOTPRINT_DIR}/Resistor_SMD.pretty"
+    def test_kicad9_env_value_not_used_as_runtime_source(self):
+        """Test that a KICAD9_* value actually set in os.environ is not used directly
+        when a KICAD10_* value is available (KiCad 10 values take precedence)"""
+        os.environ['KICAD9_FOOTPRINT_DIR'] = '/kicad9/footprints'
+        path = "${KICAD9_FOOTPRINT_DIR}/Resistor_SMD.pretty"
         result = expand_kicad_path(path)
-        self.assertIn('/kicad8/footprints', result)
+        self.assertIn('/kicad10/footprints', result)
+        self.assertNotIn('/kicad9/footprints', result)
     
     def test_expand_generic_kicad_variable(self):
         """Test expansion of KICAD_ prefixed variables"""
@@ -170,12 +179,12 @@ class TestExpandKicadPath(unittest.TestCase):
         result = expand_kicad_path(path)
         self.assertEqual(result, path)
     
-    def test_missing_variable_returns_original(self):
-        """Test that missing variables return original path"""
+    def test_missing_variable_raises_resolution_error(self):
+        """Test that an unresolvable variable raises KicadPathResolutionError
+        rather than returning a partially expanded or literal path"""
         path = "${NONEXISTENT_VAR}/library"
-        result = expand_kicad_path(path)
-        # Should contain the original variable reference
-        self.assertIn("NONEXISTENT_VAR", result)
+        with self.assertRaises(KicadPathResolutionError):
+            expand_kicad_path(path)
 
 
 class TestSafeReadFile(unittest.TestCase):

@@ -13,7 +13,7 @@
 **Why?**
 - Bakery modifies `.kicad_sch` and `.kicad_pcb` files extensively
 - The easiest way to recover from an unwanted conversion is to revert from Git
-- Backups are created automatically, but Git gives you full project history
+- Bakery does not create automatic backups; use Git or your own versioning workflow for safety
 
 **Quick Git setup (if you don't have one):**
 ```bash
@@ -69,7 +69,6 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
    - Symbol directory name (default: "Symbols")
    - 3D models folder name (default: "3D Models")
    - Datasheets directory name (default: "Data_Sheets")
-   - Enable/disable automatic backups
 4. Confirm the operation
 5. The plugin will:
    - Create local `.pretty` folders for footprints
@@ -77,10 +76,10 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
    - Create local `3D Models` folder for 3D models
    - Create local `Data_Sheets` folder for datasheets
    - Copy all used symbols, footprints, and their associated 3D models
-   - Download datasheets from internet URLs and copy local datasheet files
+   - Download datasheets from internet URLs and copy local datasheet files into the project datasheet folder
    - Update `fp-lib-table` and `sym-lib-table` to include local libraries
    - Update references in both PCB and schematic files to point to local libraries
-   - Create backups of modified files (if enabled)
+   - Leave files in place without creating automatic backups
 
 ## Project Structure After Localization
 
@@ -140,7 +139,7 @@ Bakery/
 
    ✅ **Dual Scanning**: Scans both PCB and schematic files for complete coverage
 
-   ✅ **Backup Creation**: Creates timestamped backups before modifying files
+   ✅ **No Automatic Backups**: The plugin intentionally does not create automatic backups; use Git or your own backup workflow
 
    ✅ **Progress Tracking**: Visual progress bar with step-by-step status
 
@@ -150,12 +149,12 @@ Bakery/
 
    ✅ **Path Safety**: Validates all file operations to prevent data loss
 
-   ✅ **KiCad 9 Support**: Compatible with both KiCad version 9
+   ✅ **KiCad 10 Support**: Built for KiCad version 10
 
 
 ## Requirements
 
-- KiCad 9.0 or later
+- KiCad 10.x
 - Python 3.x (bundled with KiCad)
 - wxPython (bundled with KiCad)
 
@@ -167,7 +166,7 @@ When you run Bakery, you can configure:
 - **Symbol Directory Name**: Name for the symbol library directory (default: "Symbols")
 - **3D Models Folder**: Name for the 3D models folder (default: "3D Models")
 - **Datasheets Directory Name**: Name for the local datasheets folder (default: "Data_Sheets")
-- **Create Backups**: Whether to backup files before modification (recommended)
+- **Automatic Backups**: Disabled by design; use Git or an external backup workflow for recovery
 
 ## License
 
@@ -203,7 +202,13 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 - [x] Bug fixes in S-expression parser property name handling
 - [x] Bug fixes in file read error handling for missing files
 
+### v2.0.0 - KiCad 10 Support and Backup Policy Update
+- [x] KiCad 10 project compatibility
+- [x] No automatic backups by default
+- [x] Support for KiCad 10 projects still referencing 9.x global libraries
+
 ### Planned for Future Versions
+- [ ] KiCad 11 support and compatibility review
 - [ ] Additional features based on user feedback
 
 ## Testing

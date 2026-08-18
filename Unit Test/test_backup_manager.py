@@ -49,7 +49,7 @@ class TestBackupManager(unittest.TestCase):
             f.write("Original content")
         
         self.logger = MockLogger()
-        self.backup_mgr = BackupManager(self.logger)
+        self.backup_mgr = BackupManager(self.logger, enabled=True)
     
     def tearDown(self):
         """Clean up temporary directory"""
@@ -63,9 +63,18 @@ class TestBackupManager(unittest.TestCase):
     
     def test_initialization_with_logger(self):
         """Test BackupManager initialization with logger"""
-        mgr = BackupManager(self.logger)
+        mgr = BackupManager(self.logger, enabled=True)
         self.assertIsNotNone(mgr.logger)
         self.assertEqual(mgr.logger, self.logger)
+
+    def test_create_backup_disabled(self):
+        """Test that backups are skipped silently when disabled"""
+        mgr = BackupManager(self.logger, enabled=False)
+        backup_path = mgr.create_backup(self.test_file)
+
+        self.assertIsNone(backup_path)
+        self.assertEqual(len(mgr.backups), 0)
+        self.assertEqual(len(self.logger.messages['warning']), 0)
     
     def test_create_backup_success(self):
         """Test successful backup creation"""
@@ -178,8 +187,8 @@ class TestBackupManager(unittest.TestCase):
         self.assertGreater(len(self.logger.messages['warning']), 0)
     
     def test_backup_manager_without_logger(self):
-        """Test BackupManager works without logger"""
-        mgr = BackupManager(logger=None)
+        """Test BackupManager works without logger when explicitly enabled"""
+        mgr = BackupManager(logger=None, enabled=True)
         backup_path = mgr.create_backup(self.test_file)
         
         # Should still create backup
@@ -215,7 +224,7 @@ class TestBackupManagerEdgeCases(unittest.TestCase):
         empty_file = os.path.join(self.temp_dir, "empty.txt")
         open(empty_file, 'w').close()
         
-        mgr = BackupManager(self.logger)
+        mgr = BackupManager(self.logger, enabled=True)
         backup_path = mgr.create_backup(empty_file)
         
         self.assertIsNotNone(backup_path)
@@ -230,7 +239,7 @@ class TestBackupManagerEdgeCases(unittest.TestCase):
         with open(large_file, 'w') as f:
             f.write("x" * 10000)  # 10KB file
         
-        mgr = BackupManager(self.logger)
+        mgr = BackupManager(self.logger, enabled=True)
         backup_path = mgr.create_backup(large_file)
         
         self.assertIsNotNone(backup_path)
@@ -248,7 +257,7 @@ class TestBackupManagerEdgeCases(unittest.TestCase):
         with open(binary_file, 'wb') as f:
             f.write(bytes([0, 1, 2, 3, 4, 255, 254, 253]))
         
-        mgr = BackupManager(self.logger)
+        mgr = BackupManager(self.logger, enabled=True)
         backup_path = mgr.create_backup(binary_file)
         
         self.assertIsNotNone(backup_path)

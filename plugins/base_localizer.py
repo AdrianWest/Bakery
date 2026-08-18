@@ -79,7 +79,7 @@ class BaseLocalizer(ABC):
         """
         self.logger = logger
         self.parser = SExpressionParser()
-        self.backup_manager = BackupManager(logger)
+        self.backup_manager = BackupManager(logger, enabled=False)
     
     def log(self, level: str, message: str) -> None:
         """

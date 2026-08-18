@@ -14,6 +14,9 @@ plugin registration with KiCad and sets up logging for debugging purposes.
 - Logging is configured to write to bakery_init.log in the plugin directory
 - Plugin registration is deferred to avoid loading issues during KiCad startup
 - Import errors are caught and logged for troubleshooting
+- Registration follows KiCad's active LoadPluginModule call; the editor owns
+    the action-plugin registry and must be allowed to register Bakery again when
+    PCB Editor is reopened within the same KiCad process.
 """
 import inspect
 import logging
@@ -53,12 +56,14 @@ def __is_in_call_stack(function_name: str, module_name: str) -> bool:
 
 
 try:
+    import pcbnew
+
     if __is_in_call_stack("LoadPluginModule", "pcbnew"):
         logger.info("Loading Bakery plugin...")
         from .bakery_plugin import BakeryPlugin
         BakeryPlugin().register()
         logger.info("Bakery plugin registered successfully")
-        
+
 except Exception as e:
     logger.exception(f"Fatal error loading Bakery plugin: {e}")
     raise

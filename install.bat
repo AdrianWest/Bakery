@@ -1,6 +1,9 @@
 @echo off
 REM Bakery KiCad Plugin Installer for Windows
-REM Installs the plugin to the KiCad 9.0 plugins directory
+REM Installs the plugin to the KiCad plugins directory
+
+REM *** Global KiCad version number ***
+set KICAD_VERSION=10.0
 
 echo ========================================
 echo Bakery KiCad Plugin Installer
@@ -8,12 +11,12 @@ echo ========================================
 echo.
 
 REM Define the KiCad plugins directory
-set KICAD_PLUGINS_DIR=%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\Bakery
+set KICAD_PLUGINS_DIR=%USERPROFILE%\Documents\KiCad\%KICAD_VERSION%\scripting\plugins\Bakery
 
 REM Check if the plugins directory exists, if not create it
-if not exist "%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\" (
+if not exist "%USERPROFILE%\Documents\KiCad\%KICAD_VERSION%\scripting\plugins\" (
     echo Creating KiCad plugins directory...
-    mkdir "%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\"
+    mkdir "%USERPROFILE%\Documents\KiCad\%KICAD_VERSION%\scripting\plugins\"
 )
 
 REM Remove old installation if it exists
@@ -67,7 +70,7 @@ if %ERRORLEVEL% EQU 0 (
     echo ========================================
     echo.
     echo Please check that you have write permissions to:
-    echo %USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\
+    echo %USERPROFILE%\Documents\KiCad\%KICAD_VERSION%\scripting\plugins\
     echo.
 )
 pause

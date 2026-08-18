@@ -2,7 +2,7 @@
     "$schema":  "https://go.kicad.org/pcm/schemas/v1",
     "name":  "Bakery",
     "description":  "Localize KiCad symbols, footprints, and 3D models to project libraries",
-    "description_full":  "Bakery automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures project portability by eliminating external library dependencies and provides version stability by preventing changes when global libraries are updated. Features include dual scanning of PCB and schematic files, automatic backup creation, progress tracking with detailed logging, and support for both KiCad 8 and 9.",
+    "description_full":  "Bakery automates the process of copying global library symbols, footprints, and 3D models into project-local libraries. This ensures project portability by eliminating external library dependencies and provides version stability by preventing changes when global libraries are updated. Features include dual scanning of PCB and schematic files, no automatic backups, progress tracking with detailed logging, and support for KiCad 10.",
     "identifier":  "com.github.adrianwest.bakery",
     "type":  "plugin",
     "author":  {
@@ -25,10 +25,10 @@
                        ],
     "versions":  [
                      {
-                         "version":  "1.1.0",
+                         "version":  "2.0.0",
                          "status":  "stable",
-                         "kicad_version":  "9.0",
-                         "kicad_version_max":  "9.99"
+                         "kicad_version":  "10.0",
+                         "kicad_version_max":  "10.99"
                      }
                  ]
 }

@@ -43,7 +43,7 @@ to maintain consistency and simplify maintenance.
 
 
 # Plugin metadata
-PLUGIN_VERSION = "1.0.0"
+PLUGIN_VERSION = "2.0.0"
 PLUGIN_NAME = "Bakery - Localize Symbols, Footprints, and 3D Models"
 PLUGIN_CATEGORY = "Library Management"
 PLUGIN_DESCRIPTION = "Localize all symbols and footprints to project libraries"
@@ -86,9 +86,10 @@ BYTES_PER_MB = 1024 * 1024
 MAX_CACHE_SIZE = 100
 
 # KiCad file format version
+# NOTE: Verify against a real KiCad 10 Symbol Editor save before release (see upgrade.md Checkpoint 1.6/6).
 KICAD_SYMBOL_VERSION = '20241209'
 KICAD_GENERATOR_NAME = 'kicad_symbol_editor'
-KICAD_GENERATOR_VERSION = '9.0'
+KICAD_GENERATOR_VERSION = '10.0'
 
 # Library file structure offset
 LIB_SYMBOLS_METADATA_COUNT = 4  # version, generator, generator_version fields plus kicad_symbol_lib tag
@@ -109,16 +110,21 @@ EXTENSION_PCB = ".kicad_pcb"
 EXTENSION_FP_LIB_TABLE = "fp-lib-table"
 EXTENSION_SYM_LIB_TABLE = "sym-lib-table"
 
-# KiCad version compatibility
-KICAD_VERSION_PRIMARY = "9.0"
-KICAD_VERSION_FALLBACK = "8.0"
-KICAD_VERSIONS = [KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK]
+# KiCad version compatibility - KiCad 10 only. Bakery does not discover or run
+# against KiCad 8/9 installations at runtime; see upgrade.md scope policy.
+KICAD_VERSION_PRIMARY = "10.0"
+KICAD_VERSIONS = [KICAD_VERSION_PRIMARY]
 
 # Environment variables
-ENV_VAR_PREFIX_PRIMARY = "KICAD9_"
-ENV_VAR_PREFIX_FALLBACK = "KICAD8_"
+ENV_VAR_PREFIX_PRIMARY = "KICAD10_"
 ENV_VAR_PREFIX_GENERIC = "KICAD_"
 ENV_VAR_KIPRJMOD = "KIPRJMOD"
+
+# Legacy versioned path-variable prefixes accepted only as *input* tokens in
+# existing project files (e.g. ${KICAD9_FOOTPRINT_DIR}) and normalized to the
+# KICAD10_* equivalent before resolution. Never used to look up a KiCad 9/8
+# installation, its environment values, or its configuration directories.
+LEGACY_ENV_VAR_PREFIXES = ("KICAD9_",)
 
 # Common KiCad environment variables
 KICAD_ENV_FOOTPRINT_DIR = "FOOTPRINT_DIR"
@@ -171,7 +177,6 @@ SUCCESS_LOCALIZATION_COMPLETE = "Localization complete!"
 # Confirmation messages
 CONFIRM_LOCALIZATION = (
     "This will copy all global symbols, footprints, 3D models, and datasheets to local project libraries.\n\n"
-    "Backups will be created before modifying schematic and library files.\n\n"
     "Continue?"
 )
 

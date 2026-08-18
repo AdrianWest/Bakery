@@ -33,7 +33,8 @@ libraries. It parses .kicad_sch files, extracts symbol definitions from global
 .kicad_sym libraries, and creates consolidated local symbol libraries.
 
 @section notes_symbol_localizer Notes
-- Supports KiCad 8 and 9 environment variable formats
+- Supports KiCad 10 environment variable formats; legacy KICAD9_* tokens in
+  existing project files are normalized to KICAD10_* as input migration only
 - Handles both absolute and relative library paths
 - Creates backups before modifying schematic files
 """
@@ -50,15 +51,15 @@ from .constants import (
     SEXPR_URI, SEXPR_OPTIONS, SEXPR_DESCR, SEXPR_LIB, SEXPR_SYM_LIB_TABLE,
     LIBRARY_TYPE_KICAD, PROGRESS_STEP_SCAN_SYMBOLS, PROGRESS_STEP_COPY_SYMBOLS,
     PROGRESS_STEP_UPDATE_SYM_LIB_TABLE, ENV_VAR_KIPRJMOD,
-    KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK,
-    ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC,
+    KICAD_VERSION_PRIMARY,
     KICAD_SYMBOL_VERSION, KICAD_GENERATOR_NAME, KICAD_GENERATOR_VERSION,
     LIB_SYMBOLS_METADATA_COUNT
 )
 from .base_localizer import BaseLocalizer
 from .utils import (
     expand_kicad_path, safe_read_file, find_schematic_files,
-    scan_schematics_for_items
+    scan_schematics_for_items, validate_path_safety, KicadPathResolutionError,
+    get_kicad_table_paths
 )
 
 
@@ -164,6 +165,9 @@ class SymbolLocalizer(BaseLocalizer):
         
         # Create symbol directory
         symbol_dir_path = os.path.join(project_dir, symbol_dir_name)
+        if not validate_path_safety(symbol_dir_path, project_dir):
+            self.log('error', f"Symbol directory name is unsafe, aborting: {symbol_dir_name}")
+            return []
         if not os.path.exists(symbol_dir_path):
             self.log('info', f"Creating symbol directory: {symbol_dir_name}")
             os.makedirs(symbol_dir_path)
@@ -204,22 +208,40 @@ class SymbolLocalizer(BaseLocalizer):
         if skipped_count > 0:
             self.log('info', f"Skipped {skipped_count} symbols already in {symbol_lib_name}")
         
-        # Copy symbols to local library
+        # Copy symbols to local library. Use a work queue so that parent
+        # symbols referenced via (extends ...) are copied along with the
+        # symbols that use them - KiCad requires the parent to exist in the
+        # same library file.
         copied_count = 0
         failed_count = 0
         copied_symbols = []
         symbol_contents = []
+        work_queue = list(symbols_to_copy)
+        processed = set()
         
-        for lib_name, sym_name in symbols_to_copy:
+        while work_queue:
+            lib_name, sym_name = work_queue.pop()
+            if (lib_name, sym_name) in processed:
+                continue
+            processed.add((lib_name, sym_name))
+            
             try:
                 # Find and extract the symbol from global library
-                symbol_data = self.extract_symbol_from_library(lib_name, sym_name)
+                symbol_data = self.extract_symbol_from_library(lib_name, sym_name, project_dir)
                 
                 if symbol_data:
                     self.log('info', f"  ✓ Extracted {lib_name}:{sym_name}")
                     copied_count += 1
                     copied_symbols.append((lib_name, sym_name))
                     symbol_contents.append(symbol_data)
+                    
+                    # Queue the parent symbol if this symbol extends one and
+                    # it is not already present in the local library
+                    parent_name = self.get_symbol_parent(symbol_data)
+                    if parent_name and parent_name not in existing_symbols \
+                            and (lib_name, parent_name) not in processed:
+                        self.log('info', f"    → Queuing parent symbol {lib_name}:{parent_name}")
+                        work_queue.append((lib_name, parent_name))
                 else:
                     self.log('warning', f"  ✗ Could not find source for {lib_name}:{sym_name}")
                     failed_count += 1
@@ -262,17 +284,36 @@ class SymbolLocalizer(BaseLocalizer):
         
         return symbols
     
-    def extract_symbol_from_library(self, lib_name: str, sym_name: str) -> Optional[list]:
+    def get_symbol_parent(self, symbol_sexpr: list) -> Optional[str]:
+        """
+        @brief Get the parent symbol name from a symbol's (extends ...) clause
+        
+        KiCad symbols can inherit from a parent in the same library via
+        (extends "ParentName"). The parent must exist in the same library
+        file for the library to load.
+        
+        @param symbol_sexpr: Parsed symbol S-expression
+        @return Parent symbol name, or None if the symbol has no parent
+        """
+        if isinstance(symbol_sexpr, list):
+            for item in symbol_sexpr:
+                if isinstance(item, list) and len(item) >= 2 and item[0] == 'extends':
+                    return item[1].strip('"').strip("'")
+        return None
+    
+    def extract_symbol_from_library(self, lib_name: str, sym_name: str,
+                                    project_dir: Optional[str] = None) -> Optional[list]:
         """
         @brief Extract a symbol definition from a global library
         
         @param lib_name: Library nickname
         @param sym_name: Symbol name
+        @param project_dir: Optional project directory whose table takes precedence
         @return Symbol S-expression or None if not found
         """
         try:
             # Find library path
-            lib_path = self.find_symbol_library_path(lib_name)
+            lib_path = self.find_symbol_library_path(lib_name, project_dir)
             
             if not lib_path or not os.path.exists(lib_path):
                 self.log('warning', f"    Library not found: {lib_name}")
@@ -300,95 +341,71 @@ class SymbolLocalizer(BaseLocalizer):
             self.log('error', f"    Exception extracting symbol: {str(e)}")
             return None
     
-    def find_symbol_library_path(self, lib_name: str) -> Optional[str]:
+    def find_symbol_library_path(self, lib_name: str, project_dir: Optional[str] = None) -> Optional[str]:
         """
         @brief Find the filesystem path to a symbol library
         
         @param lib_name: Library nickname
+        @param project_dir: Optional project directory whose table takes precedence
         @return Absolute path to .kicad_sym file or None if not found
         """
         try:
-            # Try common locations for global sym-lib-table
-            possible_table_paths = [
-                os.path.join(os.environ.get('APPDATA', ''), 'kicad', KICAD_VERSION_PRIMARY, 
-                            EXTENSION_SYM_LIB_TABLE),
-                os.path.join(os.environ.get('USERPROFILE', ''), 'Documents', 'KiCad', 
-                            KICAD_VERSION_PRIMARY, EXTENSION_SYM_LIB_TABLE),
-                os.path.join(os.path.expanduser('~'), '.config', 'kicad', 
-                            KICAD_VERSION_PRIMARY, EXTENSION_SYM_LIB_TABLE),
-            ]
+            # Use the active project/configuration tables first.
+            possible_table_paths = get_kicad_table_paths(EXTENSION_SYM_LIB_TABLE, project_dir)
             
-            # Also try fallback version
-            for base_path in list(possible_table_paths):
-                fallback_path = base_path.replace(KICAD_VERSION_PRIMARY, KICAD_VERSION_FALLBACK)
-                possible_table_paths.append(fallback_path)
-            
-            sym_lib_table_path = None
-            for path in possible_table_paths:
-                if os.path.exists(path):
-                    sym_lib_table_path = path
-                    break
-            
-            if not sym_lib_table_path:
+            visited_tables = set()
+
+            def find_in_table(table_path: str) -> Optional[str]:
+                if table_path in visited_tables or not os.path.exists(table_path):
+                    return None
+                visited_tables.add(table_path)
+                self.log('info', f"Checking sym-lib-table: {table_path}")
+                with open(table_path, 'r', encoding='utf-8') as f:
+                    table_sexpr = self.parser.parse(f.read())
+                found = self.parser.find_library_path(table_sexpr, lib_name)
+                if found:
+                    return found
+                delegate_uri = self.parser.find_library_path(table_sexpr, "KiCad")
+                if delegate_uri:
+                    try:
+                        return find_in_table(expand_kicad_path(delegate_uri, project_dir))
+                    except KicadPathResolutionError as e:
+                        self.log('warning', f"Could not resolve delegated sym-lib-table: {e}")
                 return None
-            
-            # Read and parse the sym-lib-table file
-            with open(sym_lib_table_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Parse S-expression
-            sexpr = self.parser.parse(content)
-            
-            # Find library path
-            lib_path = self.parser.find_library_path(sexpr, lib_name)
+
+            lib_path = None
+            for table_path in possible_table_paths:
+                lib_path = find_in_table(table_path)
+                if lib_path:
+                    break
             
             if not lib_path:
                 return None
             
             # Expand environment variables
-            expanded_path = self.expand_path(lib_path)
+            try:
+                expanded_path = self.expand_path(lib_path, project_dir)
+            except KicadPathResolutionError:
+                return None
             
             return expanded_path
                     
         except Exception as e:
             return None
     
-    def expand_path(self, path: str) -> str:
+    def expand_path(self, path: str, project_dir: Optional[str] = None) -> str:
         """
         @brief Expand environment variables in a path
+
+        Delegates to the single shared resolver in utils.py so footprints,
+        symbols, 3D models, and datasheets all resolve paths identically.
         
         @param path: Path with ${VAR_NAME} placeholders
         @return Expanded path
+
+        @throws KicadPathResolutionError if a variable cannot be resolved
         """
-        import re
-        
-        expanded_path = path
-        
-        # Find all environment variables
-        env_vars = re.findall(r'\$\{([^}]+)\}', path)
-        
-        for var in env_vars:
-            env_value = os.environ.get(var, "")
-            
-            # If KiCad 9 variable not found, try KiCad 8 equivalent
-            if not env_value and var.startswith(ENV_VAR_PREFIX_PRIMARY):
-                kicad8_var = var.replace(ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_FALLBACK)
-                env_value = os.environ.get(kicad8_var, "")
-            
-            # Also try without version number
-            if not env_value:
-                generic_var = var.replace(ENV_VAR_PREFIX_PRIMARY, ENV_VAR_PREFIX_GENERIC).replace(
-                    ENV_VAR_PREFIX_FALLBACK, ENV_VAR_PREFIX_GENERIC)
-                env_value = os.environ.get(generic_var, "")
-            
-            if env_value:
-                expanded_path = expanded_path.replace(f"${{{var}}}", env_value)
-        
-        # Handle file:// URIs
-        if expanded_path.startswith("file://"):
-            expanded_path = expanded_path[7:]
-        
-        return expanded_path
+        return expand_kicad_path(path, project_dir)
     
     def write_symbol_library(self, lib_path: str, lib_name: str, 
                             symbol_contents: List[list], existing_symbols: Set[str]):
@@ -533,13 +550,42 @@ class SymbolLocalizer(BaseLocalizer):
                 with open(sym_lib_table_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
-                # Check if library already exists in the table
-                if f'({SEXPR_NAME} "{symbol_lib_name}")' in content or f"({SEXPR_NAME} '{symbol_lib_name}')" in content:
-                    self.log('info', f"Library '{symbol_lib_name}' already exists in sym-lib-table")
-                    return True
-                
                 # Parse the S-expression
                 sexpr = self.parser.parse(content)
+                
+                # Check if library already exists and update URI if needed
+                lib_found = False
+                if isinstance(sexpr, list):
+                    for item in sexpr:
+                        if isinstance(item, list) and len(item) > 0 and item[0] == SEXPR_LIB:
+                            lib_entry_name = None
+                            uri_index = None
+                            for i, subitem in enumerate(item):
+                                if isinstance(subitem, list) and len(subitem) >= 2:
+                                    if subitem[0] == SEXPR_NAME:
+                                        lib_entry_name = subitem[1].strip('"').strip("'")
+                                    elif subitem[0] == SEXPR_URI:
+                                        uri_index = i
+                            
+                            if lib_entry_name == symbol_lib_name:
+                                lib_found = True
+                                # Update URI to ensure it points to the correct symbol file
+                                correct_uri = f'"${{{ENV_VAR_KIPRJMOD}}}/{symbol_dir_name}/{symbol_lib_name}{EXTENSION_SYMBOL}"'
+                                if uri_index is not None:
+                                    current_uri = item[uri_index][1].strip('"').strip("'")
+                                    expected = f"${{{ENV_VAR_KIPRJMOD}}}/{symbol_dir_name}/{symbol_lib_name}{EXTENSION_SYMBOL}"
+                                    if current_uri != expected:
+                                        item[uri_index] = [SEXPR_URI, correct_uri]
+                                        self.log('info', f"Updated URI for '{symbol_lib_name}' in sym-lib-table")
+                                break
+                
+                if lib_found:
+                    # Write the updated table
+                    sym_lib_content = self.parser.to_string(sexpr)
+                    with open(sym_lib_table_path, 'w', encoding='utf-8') as f:
+                        f.write(sym_lib_content)
+                    self.log('info', f"Library '{symbol_lib_name}' entry updated in sym-lib-table")
+                    return True
                 
             else:
                 self.log('info', "Creating new sym-lib-table")

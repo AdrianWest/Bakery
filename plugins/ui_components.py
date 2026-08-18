@@ -53,7 +53,7 @@ except ImportError:
         ID_OK = 1
 
 from .constants import (
-    CONFIG_DIALOG_SIZE, CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
+    PLUGIN_VERSION, CONFIG_DIALOG_SIZE, CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
     CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
     CONFIG_CREATE_BACKUPS, DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME,
     DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
@@ -67,7 +67,7 @@ class ConfigDialog(wx.Dialog):
     """!
     @brief Configuration dialog for Bakery plugin settings
     
-    Allows users to customize library names, directory names, and backup options.
+    Allows users to customize library names and output directory names.
     
     @section methods Methods
     - :py:meth:`~ConfigDialog.__init__`
@@ -96,6 +96,13 @@ class ConfigDialog(wx.Dialog):
         
         # Create main sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Plugin version
+        version_label = wx.StaticText(self, label=f"Bakery v{PLUGIN_VERSION}")
+        version_font = version_label.GetFont()
+        version_font.SetStyle(wx.FONTSTYLE_ITALIC)
+        version_label.SetFont(version_font)
+        main_sizer.Add(version_label, 0, wx.ALL, 5)
         
         # Footprint library name setting
         lib_label = wx.StaticText(self, label="Local Footprint Library Name:")
@@ -146,11 +153,6 @@ class ConfigDialog(wx.Dialog):
             value=config.get(CONFIG_DATASHEETS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME)
         )
         main_sizer.Add(self.datasheets_dir_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
-        
-        # Backup option
-        self.backup_checkbox = wx.CheckBox(self, label="Create backups before modifying files")
-        self.backup_checkbox.SetValue(config.get(CONFIG_CREATE_BACKUPS, True))
-        main_sizer.Add(self.backup_checkbox, 0, wx.ALL, 5)
         
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -205,17 +207,17 @@ class ConfigDialog(wx.Dialog):
             )
             return
         
-        if not models_dir.strip():
+        if not validate_library_name(models_dir):
             wx.MessageBox(
-                "3D models directory name cannot be empty",
+                "3D models directory name is empty or contains invalid characters",
                 "Validation Error",
                 wx.OK | wx.ICON_ERROR
             )
             return
         
-        if not datasheets_dir.strip():
+        if not validate_library_name(datasheets_dir):
             wx.MessageBox(
-                "Datasheets directory name cannot be empty",
+                "Datasheets directory name is empty or contains invalid characters",
                 "Validation Error",
                 wx.OK | wx.ICON_ERROR
             )
@@ -227,7 +229,7 @@ class ConfigDialog(wx.Dialog):
         self.config[CONFIG_SYMBOL_DIR_NAME] = sym_dir
         self.config[CONFIG_MODELS_DIR_NAME] = models_dir
         self.config[CONFIG_DATASHEETS_DIR_NAME] = datasheets_dir
-        self.config[CONFIG_CREATE_BACKUPS] = self.backup_checkbox.GetValue()
+        self.config[CONFIG_CREATE_BACKUPS] = False
         
         self.EndModal(wx.ID_OK)
     
@@ -282,7 +284,6 @@ class BakeryLogger(wx.Dialog):
         @param title: Dialog window title
         """
         super(BakeryLogger, self).__init__(parent, title=title, size=LOGGER_WINDOW_SIZE)
-        
         # Create main sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
@@ -327,6 +328,7 @@ class BakeryLogger(wx.Dialog):
         )
         self.warnings_text.SetFont(font)
         self.warnings_text.SetBackgroundColour(wx.Colour(*COLOR_WARNING_BG))
+        self.warnings_text.SetForegroundColour(wx.Colour(0, 0, 0))
         warnings_box.Add(self.warnings_text, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
         issues_sizer.Add(warnings_box, 1, wx.EXPAND)
@@ -342,6 +344,7 @@ class BakeryLogger(wx.Dialog):
         )
         self.errors_text.SetFont(font)
         self.errors_text.SetBackgroundColour(wx.Colour(*COLOR_ERROR_BG))
+        self.errors_text.SetForegroundColour(wx.Colour(0, 0, 0))
         errors_box.Add(self.errors_text, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
         issues_sizer.Add(errors_box, 1, wx.EXPAND)
@@ -441,7 +444,7 @@ class BakeryLogger(wx.Dialog):
         """
         self.close_btn.Enable(True)
         self.progress_label.SetLabel("Complete")
-    
+
     def on_close(self, event):
         """
         @brief Handle close button click

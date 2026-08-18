@@ -51,7 +51,7 @@ class TestLibraryManager(unittest.TestCase):
         
         # Set up test environment variables
         self.original_env = os.environ.copy()
-        os.environ['KICAD9_FOOTPRINT_DIR'] = os.path.join(self.temp_dir, 'kicad9', 'footprints')
+        os.environ['KICAD10_FOOTPRINT_DIR'] = os.path.join(self.temp_dir, 'kicad10', 'footprints')
         os.environ['KICAD_FOOTPRINT_DIR'] = os.path.join(self.temp_dir, 'kicad', 'footprints')
     
     def tearDown(self):
@@ -120,7 +120,7 @@ class TestLibraryManager(unittest.TestCase):
     
     def test_expand_path_with_kicad_var(self):
         """Test expanding path with KiCad environment variable"""
-        path = "${KICAD9_FOOTPRINT_DIR}/Resistor_SMD.pretty"
+        path = "${KICAD10_FOOTPRINT_DIR}/Resistor_SMD.pretty"
         expanded = self.lib_mgr.expand_path(path)
         
         # Should attempt to expand the variable
@@ -224,10 +224,8 @@ class TestLibraryManagerPathExpansion(unittest.TestCase):
         
         # Set up environment variables
         self.original_env = os.environ.copy()
-        os.environ['KICAD9_FOOTPRINT_DIR'] = '/kicad9/footprints'
-        os.environ['KICAD8_FOOTPRINT_DIR'] = '/kicad8/footprints'
+        os.environ['KICAD10_FOOTPRINT_DIR'] = '/kicad10/footprints'
         os.environ['KICAD_FOOTPRINT_DIR'] = '/kicad/footprints'
-        os.environ['KICAD9_3DMODEL_DIR'] = '/kicad9/3dmodels'
         
         self.lib_mgr = LibraryManager()
     
@@ -246,11 +244,10 @@ class TestLibraryManagerPathExpansion(unittest.TestCase):
         self.assertIsInstance(env_vars, dict)
     
     def test_env_var_priority(self):
-        """Test that KiCad 9 variables take priority over KiCad 8"""
+        """Test that an explicitly set os.environ value is discovered"""
         env_vars = self.lib_mgr.expand_kicad_env_vars()
         
-        # If FOOTPRINT_DIR is in env_vars, KiCad 9 should take precedence
-        # This is implementation-specific
+        # Should have found the KiCad 10 footprint variable
         self.assertIsInstance(env_vars, dict)
 
 

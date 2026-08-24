@@ -9,6 +9,7 @@ import os
 import unittest
 import tempfile
 import shutil
+from unittest.mock import MagicMock
 
 # Use import helper for modules with relative imports
 from import_helper import import_bakery_module
@@ -57,7 +58,6 @@ class TestSymbolLocalizer(unittest.TestCase):
         localizer = SymbolLocalizer()
         self.assertIsNotNone(localizer)
         self.assertIsNotNone(localizer.parser)
-        self.assertIsNotNone(localizer.backup_manager)
     
     def test_initialization_with_logger(self):
         """Test SymbolLocalizer initialization with logger"""
@@ -106,6 +106,141 @@ class TestSymbolLocalizer(unittest.TestCase):
         
         # Test that method exists
         self.assertTrue(hasattr(self.localizer, 'copy_symbols'))
+
+    def test_same_named_symbols_get_distinct_local_names(self):
+        """Symbols from different libraries must not alias each other"""
+        def extract_symbol(library_name, symbol_name, project_dir=None):
+            return [
+                "symbol",
+                f'"{symbol_name}"',
+                ["property", '"Value"', f'"{library_name}"']
+            ]
+
+        self.localizer.extract_symbol_from_library = extract_symbol
+        records = self.localizer.copy_symbols(
+            {("LibraryA", "Shared"), ("LibraryB", "Shared")},
+            self.project_dir,
+            "LocalSymbols",
+            "Symbols"
+        )
+
+        target_names = {record[2] for record in records}
+        self.assertEqual(len(target_names), 2)
+        self.assertTrue(
+            any(name.startswith("LibraryA__Shared_") for name in target_names)
+        )
+        self.assertTrue(
+            any(name.startswith("LibraryB__Shared_") for name in target_names)
+        )
+        library_path = os.path.join(
+            self.project_dir,
+            "Symbols",
+            "LocalSymbols.kicad_sym"
+        )
+        with open(library_path, 'r', encoding='utf-8') as library:
+            content = library.read()
+        for target_name in target_names:
+            self.assertIn(target_name, content)
+
+        rerun_records = self.localizer.copy_symbols(
+            {("LibraryA", "Shared"), ("LibraryB", "Shared")},
+            self.project_dir,
+            "LocalSymbols",
+            "Symbols"
+        )
+        self.assertEqual(
+            {record[2] for record in rerun_records},
+            target_names
+        )
+
+    def test_symbol_parent_and_units_are_renamed(self):
+        """Renaming updates unit names and inherited parent references"""
+        symbol = [
+            "symbol",
+            '"Child"',
+            ["extends", '"Parent"'],
+            ["symbol", '"Child_0_1"']
+        ]
+
+        renamed = self.localizer.rename_symbol_for_local_library(
+            symbol,
+            "Vendor",
+            "Child",
+            "Vendor__Child",
+            "Parent"
+        )
+
+        self.assertEqual(renamed[1], '"Vendor__Child"')
+        self.assertTrue(
+            renamed[2][1].startswith('"Vendor__Parent_')
+        )
+        self.assertEqual(renamed[3][1], '"Vendor__Child_0_1"')
+
+    def test_embedded_schematic_symbol_units_follow_localized_root(self):
+        """Embedded child units use the localized root symbol prefix."""
+        content = '''(kicad_sch
+  (lib_symbols
+    (symbol "Device:C_Small"
+      (property "Value" "C_Small")
+      (symbol "C_Small_0_1"
+        (polyline)
+      )
+      (symbol "C_Small_1_1"
+        (pin passive line)
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:C_Small")
+  )
+)'''
+        records = [
+            (
+                "Device",
+                "C_Small",
+                "Device__C_Small_f867c60b3d",
+                ["symbol"]
+            )
+        ]
+
+        count, updated = (
+            self.localizer._rename_embedded_symbol_definitions(
+                content,
+                records,
+                "MySymbols"
+            )
+        )
+
+        self.assertEqual(count, 3)
+        self.assertIn(
+            '(symbol "MySymbols:Device__C_Small_f867c60b3d"',
+            updated
+        )
+        self.assertIn(
+            '(symbol "Device__C_Small_f867c60b3d_0_1"',
+            updated
+        )
+        self.assertIn(
+            '(symbol "Device__C_Small_f867c60b3d_1_1"',
+            updated
+        )
+        self.assertIn('(lib_id "Device:C_Small")', updated)
+
+    def test_schematic_update_failure_is_propagated(self):
+        """A failed schematic write aborts symbol localization"""
+        schematic = os.path.join(self.project_dir, "test.kicad_sch")
+        with open(schematic, 'w', encoding='utf-8') as sch:
+            sch.write('(lib_id "Source:Part")')
+        self.localizer.update_schematic_file = MagicMock(
+            side_effect=OSError("write failed")
+        )
+
+        with self.assertRaises(OSError):
+            self.localizer.update_schematic_references(
+                [("Source", "Part", "Source__Part_hash", ["symbol"])],
+                self.project_dir,
+                "Local"
+            )
     
     def test_get_symbols_in_library(self):
         """Test getting list of symbols in a library file"""
@@ -139,11 +274,6 @@ class TestSymbolLocalizer(unittest.TestCase):
         
         # Test that method exists
         self.assertTrue(hasattr(self.localizer, 'find_symbol_library_path'))
-    
-    def test_expand_path(self):
-        """Test expanding symbol library path"""
-        # Test that method exists
-        self.assertTrue(hasattr(self.localizer, 'expand_path'))
     
     def test_write_symbol_library(self):
         """Test writing symbol library file"""

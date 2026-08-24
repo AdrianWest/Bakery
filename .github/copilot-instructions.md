@@ -24,8 +24,6 @@ Bakery KiCad Plugin
 │   └── sexpr_parser.py
 ├── UI Components (logging and configuration dialogs)
 │   └── ui_components.py
-├── Backup Manager (file backup utilities)
-│   └── backup_manager.py
 └── Constants (configuration and messages)
     └── constants.py
 ```
@@ -36,7 +34,6 @@ Bakery KiCad Plugin
 - **Library Manager** (`library_manager.py`): Creates/updates fp-lib-table, manages library metadata
 - **S-Expression Parser** (`sexpr_parser.py`): Parses and serializes KiCad S-expression format
 - **UI Components** (`ui_components.py`): Logger window with progress bar, configuration dialog
-- **Backup Manager** (`backup_manager.py`): Creates timestamped backups before file modifications
 - **Constants** (`constants.py`): Centralized configuration values and UI messages
 
 ## Project-Specific Conventions
@@ -155,7 +152,7 @@ cp -r Bakery ~/Library/Preferences/kicad/9.0/scripting/plugins/
 # The plugin runs within KiCad:
 # 1. Open KiCad PCB Editor (pcbnew)
 # 2. Tools > External Plugins > Bakery - Localize Symbols, Footprints, and 3d Models
-# 3. Configure options in dialog (library name, backups, etc.)
+# 3. Configure library and output directory names in the dialog
 # 4. Plugin executes and shows progress window
 
 # To reload after changes:
@@ -168,7 +165,6 @@ cp -r Bakery ~/Library/Preferences/kicad/9.0/scripting/plugins/
 - `library_manager.py` - Library creation and management
 - `sexpr_parser.py` - S-expression parsing utilities
 - `ui_components.py` - Logger window and configuration dialog
-- `backup_manager.py` - File backup handling
 - `constants.py` - Configuration constants
 - `Bakery_Icon.png` - Plugin icon (24x24px)
 - `metadata.json` - Plugin metadata for KiCad 10.0+ Plugin Manager

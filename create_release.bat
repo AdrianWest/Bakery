@@ -60,6 +60,7 @@ echo Copying plugin files...
 copy "plugins\__init__.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\bakery_plugin.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\base_localizer.py" "%RELEASE_DIR%\plugins\" > nul
+copy "plugins\backup_manager.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\constants.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\footprint_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\symbol_localizer.py" "%RELEASE_DIR%\plugins\" > nul
@@ -67,7 +68,6 @@ copy "plugins\data_sheet_localizer.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\library_manager.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\sexpr_parser.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\ui_components.py" "%RELEASE_DIR%\plugins\" > nul
-copy "plugins\backup_manager.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\utils.py" "%RELEASE_DIR%\plugins\" > nul
 copy "plugins\metadata.json" "%RELEASE_DIR%\plugins\" > nul
 
@@ -77,6 +77,20 @@ if exist "plugins\resources\Bakery_Icon.png" (
     echo   - plugins\resources\Bakery_Icon.png copied
 ) else (
     echo WARNING: plugins\resources\Bakery_Icon.png not found!
+)
+
+if exist "plugins\resources\Banner-No-robot.png" (
+    copy "plugins\resources\Banner-No-robot.png" "%RELEASE_DIR%\plugins\resources\" > nul
+    echo   - plugins\resources\Banner-No-robot.png copied
+) else (
+    echo WARNING: plugins\resources\Banner-No-robot.png not found!
+)
+
+if exist "plugins\resources\Banner-No-BK.png" (
+    copy "plugins\resources\Banner-No-BK.png" "%RELEASE_DIR%\plugins\resources\" > nul
+    echo   - plugins\resources\Banner-No-BK.png copied
+) else (
+    echo WARNING: plugins\resources\Banner-No-BK.png not found!
 )
 
 echo Copying root-level resources...

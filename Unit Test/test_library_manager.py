@@ -71,14 +71,6 @@ class TestLibraryManager(unittest.TestCase):
         mgr = LibraryManager(self.logger)
         self.assertEqual(mgr.logger, self.logger)
     
-    def test_expand_kicad_env_vars(self):
-        """Test expanding KiCad environment variables"""
-        env_vars = self.lib_mgr.expand_kicad_env_vars()
-        
-        self.assertIsInstance(env_vars, dict)
-        # Should have expanded some environment variables
-        self.assertGreaterEqual(len(env_vars), 0)
-    
     def test_create_local_footprint_library(self):
         """Test creating a local footprint library"""
         lib_name = "TestLib"
@@ -207,10 +199,6 @@ class TestLibraryManager(unittest.TestCase):
         
         # Should not crash when logging
         mgr.log('info', 'Test message')
-        
-        # Other operations should still work
-        env_vars = mgr.expand_kicad_env_vars()
-        self.assertIsInstance(env_vars, dict)
 
 
 class TestLibraryManagerPathExpansion(unittest.TestCase):
@@ -237,18 +225,15 @@ class TestLibraryManagerPathExpansion(unittest.TestCase):
     
     def test_expand_multiple_variables(self):
         """Test expanding path with multiple environment variables"""
-        # This tests the environment variable expansion logic
-        env_vars = self.lib_mgr.expand_kicad_env_vars()
-        
-        # Should have found some variables
-        self.assertIsInstance(env_vars, dict)
+        expanded = self.lib_mgr.expand_path(
+            "${KICAD10_FOOTPRINT_DIR}/${KICAD_FOOTPRINT_DIR}"
+        )
+        self.assertEqual(expanded, "/kicad10/footprints//kicad/footprints")
     
     def test_env_var_priority(self):
         """Test that an explicitly set os.environ value is discovered"""
-        env_vars = self.lib_mgr.expand_kicad_env_vars()
-        
-        # Should have found the KiCad 10 footprint variable
-        self.assertIsInstance(env_vars, dict)
+        expanded = self.lib_mgr.expand_path("${KICAD10_FOOTPRINT_DIR}")
+        self.assertEqual(expanded, "/kicad10/footprints")
 
 
 class TestLibraryManagerEdgeCases(unittest.TestCase):

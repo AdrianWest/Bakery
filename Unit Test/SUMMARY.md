@@ -15,20 +15,20 @@ A comprehensive unit test suite for the Bakery KiCad Plugin with the following c
 3. **test_sexpr_parser.py** (290 lines)
    - 25+ test methods for S-expression parsing, serialization, and caching
 
-4. **test_backup_manager.py** (280 lines)
-   - 20+ test methods for file backup creation, tracking, and edge cases
-
-5. **test_library_manager.py** (330 lines)
+4. **test_library_manager.py** (330 lines)
    - 25+ test methods for library management, path expansion, and table updates
 
-6. **test_base_localizer.py** (290 lines)
+5. **test_base_localizer.py** (290 lines)
    - 20+ test methods for base localizer functionality
 
-7. **test_footprint_localizer.py** (150 lines)
+6. **test_footprint_localizer.py** (150 lines)
    - 10+ test methods for footprint and 3D model localization
 
-8. **test_symbol_localizer.py** (150 lines)
+7. **test_symbol_localizer.py** (150 lines)
    - 15+ test methods for symbol localization
+
+8. **test_data_sheet_localizer.py**
+   - Tests datasheet scanning, copying, downloading, and reference updates
 
 9. **test_ui_components.py** (120 lines)
    - 10+ test methods for UI components (with wx mocking)
@@ -80,7 +80,6 @@ A comprehensive unit test suite for the Bakery KiCad Plugin with the following c
 ✅ constants.py - Full coverage of all constants and configuration values
 ✅ utils.py - Path validation, file operations, library name validation
 ✅ sexpr_parser.py - Parsing, serialization, caching, finding elements
-✅ backup_manager.py - Backup creation, tracking, error handling
 ✅ library_manager.py - Library creation, path expansion, table management
 ✅ base_localizer.py - Common functionality, file operations, schematic handling
 ✅ footprint_localizer.py - Footprint localization workflow
@@ -201,7 +200,6 @@ Unit Test/
 ├── test_constants.py            # Constants module tests
 ├── test_utils.py                # Utils module tests
 ├── test_sexpr_parser.py         # S-expression parser tests
-├── test_backup_manager.py       # Backup manager tests
 ├── test_library_manager.py      # Library manager tests
 ├── test_base_localizer.py       # Base localizer tests
 ├── test_footprint_localizer.py  # Footprint localizer tests

@@ -60,7 +60,6 @@ class TestFootprintLocalizer(unittest.TestCase):
         self.assertIsNotNone(localizer)
         self.assertIsNotNone(localizer.lib_manager)
         self.assertIsNotNone(localizer.parser)
-        self.assertIsNotNone(localizer.backup_manager)
     
     def test_initialization_with_logger(self):
         """Test FootprintLocalizer initialization with logger"""
@@ -127,6 +126,63 @@ class TestFootprintLocalizer(unittest.TestCase):
         # This would require more complex mocking or actual file operations
         # For now, just test the method exists
         self.assertTrue(hasattr(self.localizer, 'copy_footprints'))
+
+    def test_same_named_footprints_get_distinct_local_names(self):
+        """Footprints from different libraries must not overwrite"""
+        library_paths = {}
+        for library_name, marker in (("LibraryA", "A"), ("LibraryB", "B")):
+            library_path = os.path.join(
+                self.temp_dir,
+                f"{library_name}.pretty"
+            )
+            os.makedirs(library_path)
+            with open(
+                os.path.join(library_path, "Shared.kicad_mod"),
+                'w',
+                encoding='utf-8'
+            ) as footprint:
+                footprint.write(f'(footprint "Shared" (descr "{marker}"))')
+            library_paths[library_name] = library_path
+
+        self.localizer.lib_manager.find_footprint_library_path = (
+            lambda library_name, project_dir=None: library_paths[library_name]
+        )
+        records = self.localizer.copy_footprints(
+            {("LibraryA", "Shared"), ("LibraryB", "Shared")},
+            self.project_dir,
+            "Local"
+        )
+
+        target_names = {record[2] for record in records}
+        self.assertEqual(len(target_names), 2)
+        self.assertTrue(
+            any(name.startswith("LibraryA__Shared_") for name in target_names)
+        )
+        self.assertTrue(
+            any(name.startswith("LibraryB__Shared_") for name in target_names)
+        )
+        for record in records:
+            self.assertTrue(os.path.exists(record[4]))
+
+    def test_footprint_path_traversal_is_rejected(self):
+        """Footprint names cannot escape their source library"""
+        library_path = os.path.join(self.temp_dir, "Source.pretty")
+        os.makedirs(library_path)
+        outside_path = os.path.join(self.temp_dir, "outside.kicad_mod")
+        with open(outside_path, 'w', encoding='utf-8') as footprint:
+            footprint.write('(footprint "outside")')
+        self.localizer.lib_manager.find_footprint_library_path = (
+            lambda library_name, project_dir=None: library_path
+        )
+
+        result = self.localizer.find_and_copy_footprint(
+            "Source",
+            "../outside",
+            "Source__outside",
+            os.path.join(self.project_dir, "Local.pretty")
+        )
+
+        self.assertIsNone(result)
     
     def test_localize_3d_models(self):
         """Test localizing 3D models"""
@@ -140,6 +196,61 @@ class TestFootprintLocalizer(unittest.TestCase):
         
         # Test that method exists
         self.assertTrue(hasattr(self.localizer, 'localize_3d_models'))
+
+    def test_same_named_models_get_distinct_destinations(self):
+        """Models with one basename but different sources must not overwrite"""
+        models_dir = os.path.join(self.project_dir, "Models")
+        os.makedirs(models_dir)
+        copied_models = {}
+        new_paths = []
+        for directory_name, content in (("a", "model a"), ("b", "model b")):
+            source_dir = os.path.join(self.temp_dir, directory_name)
+            os.makedirs(source_dir)
+            source_path = os.path.join(source_dir, "shared.step")
+            with open(source_path, 'w', encoding='utf-8') as model:
+                model.write(content)
+            success, _, new_path = self.localizer.copy_single_model(
+                source_path,
+                source_path,
+                models_dir,
+                "Models",
+                copied_models
+            )
+            self.assertTrue(success)
+            new_paths.append(new_path)
+
+        self.assertNotEqual(new_paths[0], new_paths[1])
+        self.assertEqual(len(os.listdir(models_dir)), 2)
+
+    def test_project_local_model_is_not_rehashed(self):
+        """A localized KIPRJMOD model remains stable on reruns"""
+        models_dir = os.path.join(self.project_dir, "Models")
+        os.makedirs(models_dir)
+        model_path = os.path.join(models_dir, "existing.step")
+        with open(model_path, 'w', encoding='utf-8') as model:
+            model.write("model")
+        footprint_path = os.path.join(self.project_dir, "local.kicad_mod")
+        local_reference = "${KIPRJMOD}/Models/existing.step"
+        with open(footprint_path, 'w', encoding='utf-8') as footprint:
+            footprint.write(
+                f'(footprint "Local" (model "{local_reference}"))'
+            )
+
+        old_paths, new_paths, copied, failed = (
+            self.localizer.process_footprint_models(
+                "Local",
+                footprint_path,
+                self.project_dir,
+                models_dir,
+                "Models",
+                {}
+            )
+        )
+
+        self.assertEqual(old_paths, [local_reference])
+        self.assertEqual(new_paths, [local_reference])
+        self.assertEqual((copied, failed), (0, 0))
+        self.assertEqual(os.listdir(models_dir), ["existing.step"])
     
     def test_update_pcb_references_mock(self):
         """Test updating PCB footprint references using mock"""
@@ -153,60 +264,38 @@ class TestFootprintLocalizer(unittest.TestCase):
         # Test that method exists
         self.assertTrue(hasattr(self.localizer, 'update_pcb_references'))
 
-    def test_reload_footprints_from_library(self):
-        """Test reloading footprints while preserving board state and pad nets"""
-        local_lib_path = os.path.join(self.project_dir, "MyLib.pretty")
-        os.makedirs(local_lib_path)
+    def test_update_pcb_references_does_not_save_board(self):
+        """The coordinator performs the single final board save."""
+        mock_board = MagicMock()
+        mock_footprint = MagicMock()
+        mock_footprint.GetFPID().GetLibItemName().__str__.return_value = (
+            "R_0805"
+        )
+        mock_footprint.GetFPID().GetLibNickname().__str__.return_value = (
+            "OldLib"
+        )
+        mock_footprint.Models.return_value = []
+        mock_board.GetFootprints.return_value = [mock_footprint]
+        pcbnew_stub = MagicMock()
 
-        old_net = Mock()
-        old_pad = Mock()
-        old_pad.GetNumber.return_value = "1"
-        old_pad.GetNet.return_value = old_net
-
-        old_fpid = Mock()
-        old_fpid.GetLibItemName.return_value = "R_0805"
-        old_footprint = Mock()
-        old_footprint.GetFPID.return_value = old_fpid
-        old_footprint.GetReference.return_value = "R1"
-        old_footprint.IsFlipped.return_value = False
-        old_footprint.GetFields.return_value = []
-        old_footprint.GetFieldsText.return_value = {}
-        old_footprint.Pads.return_value = [old_pad]
-
-        new_pad = Mock()
-        new_pad.GetNumber.return_value = "1"
-        new_footprint = Mock()
-        new_footprint.GetFields.return_value = []
-        new_footprint.Pads.return_value = [new_pad]
-
-        mock_board = Mock()
-        mock_board.GetFootprints.return_value = [old_footprint]
-        mock_pcbnew = MagicMock()
-        mock_pcbnew.FootprintLoad.return_value = new_footprint
-
-        with patch.dict(sys.modules, {'pcbnew': mock_pcbnew}):
-            result = self.localizer.reload_footprints_from_library(
+        with patch.dict(sys.modules, {'pcbnew': pcbnew_stub}):
+            updated = self.localizer.update_pcb_references(
                 mock_board,
-                self.project_dir,
-                "MyLib"
+                [
+                    (
+                        "OldLib",
+                        "R_0805",
+                        "OldLib__R_0805",
+                        "source.kicad_mod",
+                        "target.kicad_mod"
+                    )
+                ],
+                "project.kicad_pcb",
+                "LocalFootprints"
             )
 
-        self.assertEqual(result, (1, 0))
-        mock_pcbnew.FootprintLoad.assert_called_once_with(
-            local_lib_path,
-            "R_0805",
-            False
-        )
-        new_footprint.SetPosition.assert_called_once_with(
-            old_footprint.GetPosition.return_value
-        )
-        new_footprint.SetOrientation.assert_called_once_with(
-            old_footprint.GetOrientation.return_value
-        )
-        new_pad.SetNet.assert_called_once_with(old_net)
-        mock_board.Add.assert_called_once_with(new_footprint)
-        mock_board.Remove.assert_called_once_with(old_footprint)
-        mock_board.BuildConnectivity.assert_called_once_with()
+        self.assertEqual(updated, 1)
+        mock_board.Save.assert_not_called()
 
     def test_update_pcb_model_paths_rewrites_embedded_models(self):
         """Test rewriting localized model paths in the saved PCB"""

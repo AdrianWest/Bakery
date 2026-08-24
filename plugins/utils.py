@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file utils.py
 
 @brief Utility functions shared across Bakery plugin modules
@@ -41,12 +38,66 @@ schematic file discovery, and library table management functions.
 
 import os
 import re
-from typing import Optional
-from .constants import MAX_FILE_SIZE_BYTES, ENV_VAR_PREFIX_PRIMARY, LEGACY_ENV_VAR_PREFIXES
+import hashlib
+import stat
+import tempfile
+from typing import Callable, Optional, Union
+from .constants import (
+    LIBRARY_TYPE_KICAD, MAX_FILE_SIZE_BYTES, ENV_VAR_PREFIX_PRIMARY,
+    LEGACY_ENV_VAR_PREFIXES, SEXPR_DESCR, SEXPR_LIB, SEXPR_NAME,
+    SEXPR_OPTIONS, SEXPR_TYPE, SEXPR_URI
+)
+from .sexpr_parser import SExpressionParseError, SExpressionParser
 
 
 # Maximum file size to read into memory (50MB)
 MAX_FILE_SIZE = MAX_FILE_SIZE_BYTES
+
+
+def log_message(logger: Optional[Callable], level: str, message: str) -> None:
+    """
+    @brief Send a message to a logger method when available
+
+    @param logger: Optional logger object with level-named methods
+    @param level: Logger method name such as info, warning, error, or success
+    @param message: Message to send
+    """
+    if logger:
+        method = getattr(logger, level, None)
+        if method:
+            method(message)
+
+
+class LoggerMixin:
+    """!
+    @brief Provide consistent logger dispatch for Bakery service classes.
+    """
+
+    logger: Optional[Callable]
+
+    def log(self, level: str, message: str) -> None:
+        """
+        @brief Send a message through the configured logger
+
+        @param level: Logger method name such as info, warning, error, or success
+        @param message: Message to send
+        """
+        log_message(self.logger, level, message)
+
+
+class ParserLoggerMixin(LoggerMixin):
+    """!
+    @brief Provide shared parser and logger initialization for Bakery services.
+    """
+
+    def __init__(self, logger: Optional[Callable] = None):
+        """
+        @brief Initialize a service with a logger and S-expression parser
+
+        @param logger: Optional logger object with level-named methods
+        """
+        self.logger = logger
+        self.parser = SExpressionParser()
 
 
 def get_kicad_table_paths(table_name: str, project_dir: Optional[str] = None) -> list:
@@ -72,6 +123,166 @@ def get_kicad_table_paths(table_name: str, project_dir: Optional[str] = None) ->
         os.path.join(os.path.expanduser('~'), 'Library', 'Preferences', 'kicad', '10.0', table_name),
     ])
     return list(dict.fromkeys(candidates))
+
+
+def resolve_library_path(
+    table_name: str,
+    lib_name: str,
+    parser,
+    logger: Optional[Callable] = None,
+    project_dir: Optional[str] = None
+) -> Optional[str]:
+    """
+    @brief Resolve a library nickname through KiCad library tables
+
+    Searches project and user tables in precedence order and follows delegated
+    KiCad tables without revisiting a table.
+
+    @param table_name: KiCad library table filename
+    @param lib_name: Library nickname to resolve
+    @param parser: SExpressionParser-compatible parser
+    @param logger: Optional logger object
+    @param project_dir: Optional project directory whose table takes precedence
+    @return Expanded library path, or None when the nickname cannot be resolved
+    """
+    pending_tables = get_kicad_table_paths(table_name, project_dir)
+    visited_tables = set()
+
+    while pending_tables:
+        table_path = pending_tables.pop(0)
+        if table_path in visited_tables or not os.path.exists(table_path):
+            continue
+        visited_tables.add(table_path)
+        log_message(logger, 'info', f"Checking {table_name}: {table_path}")
+
+        try:
+            table_sexpr = parser.parse(safe_read_file(table_path))
+        except (OSError, UnicodeError, SExpressionParseError) as error:
+            log_message(
+                logger,
+                'warning',
+                f"Could not read {table_name} at {table_path}: {error}"
+            )
+            continue
+
+        library_uri = parser.find_library_path(table_sexpr, lib_name)
+        if library_uri:
+            try:
+                return expand_kicad_path(library_uri, project_dir)
+            except KicadPathResolutionError as error:
+                log_message(
+                    logger,
+                    'warning',
+                    f"Could not resolve path for '{lib_name}': {error}"
+                )
+                return None
+
+        delegate_uri = parser.find_library_path(table_sexpr, "KiCad")
+        if delegate_uri:
+            try:
+                delegated_table = expand_kicad_path(delegate_uri, project_dir)
+            except KicadPathResolutionError as error:
+                log_message(
+                    logger,
+                    'warning',
+                    f"Could not resolve delegated {table_name}: {error}"
+                )
+            else:
+                pending_tables.insert(0, delegated_table)
+
+    log_message(
+        logger,
+        'warning',
+        f"Library '{lib_name}' not found in {table_name}"
+    )
+    return None
+
+
+def update_library_table(
+    table_path: str,
+    table_tag: str,
+    lib_name: str,
+    library_uri: str,
+    parser,
+    logger: Optional[Callable] = None,
+    description: str = ""
+) -> bool:
+    """
+    @brief Add or update a library entry in a KiCad library table
+
+    @param table_path: Destination fp-lib-table or sym-lib-table path
+    @param table_tag: Root S-expression tag for the table
+    @param lib_name: Library nickname
+    @param library_uri: Unquoted KiCad URI for the library
+    @param parser: SExpressionParser-compatible parser
+    @param logger: Optional logger object
+    @param description: Optional library description
+    @return True when the table was updated successfully
+    """
+    try:
+        if os.path.exists(table_path):
+            table_sexpr = parser.parse(safe_read_file(table_path))
+            if not (
+                isinstance(table_sexpr, list)
+                and table_sexpr
+                and table_sexpr[0] == table_tag
+            ):
+                log_message(
+                    logger,
+                    'error',
+                    f"Invalid KiCad library table: {table_path}"
+                )
+                return False
+        else:
+            table_sexpr = [table_tag]
+
+        quoted_uri = f'"{library_uri}"'
+        for entry in table_sexpr[1:]:
+            if not isinstance(entry, list) or not entry or entry[0] != SEXPR_LIB:
+                continue
+
+            entry_name = None
+            uri_index = None
+            for index, field in enumerate(entry):
+                if not isinstance(field, list) or len(field) < 2:
+                    continue
+                if field[0] == SEXPR_NAME:
+                    entry_name = field[1].strip('"').strip("'")
+                elif field[0] == SEXPR_URI:
+                    uri_index = index
+
+            if entry_name != lib_name:
+                continue
+
+            if uri_index is None:
+                entry.append([SEXPR_URI, quoted_uri])
+            else:
+                entry[uri_index] = [SEXPR_URI, quoted_uri]
+            break
+        else:
+            table_sexpr.append([
+                SEXPR_LIB,
+                [SEXPR_NAME, f'"{lib_name}"'],
+                [SEXPR_TYPE, f'"{LIBRARY_TYPE_KICAD}"'],
+                [SEXPR_URI, quoted_uri],
+                [SEXPR_OPTIONS, '""'],
+                [SEXPR_DESCR, f'"{description}"']
+            ])
+
+        atomic_write_file(table_path, parser.to_string(table_sexpr))
+        log_message(
+            logger,
+            'info',
+            f"Library '{lib_name}' updated in {os.path.basename(table_path)}"
+        )
+        return True
+    except (OSError, UnicodeError, SExpressionParseError, TypeError, IndexError) as error:
+        log_message(
+            logger,
+            'error',
+            f"Failed to update {os.path.basename(table_path)}: {error}"
+        )
+        return False
 
 
 def validate_library_name(name: str) -> bool:
@@ -102,14 +313,54 @@ def validate_path_safety(path: str, project_dir: str) -> bool:
     is within the project directory boundary.
     """
     try:
-        # Resolve to absolute paths
         abs_path = os.path.realpath(path)
         abs_project = os.path.realpath(project_dir)
-        
-        # Check if path is within project directory
-        return abs_path.startswith(abs_project)
-    except Exception:
+        common_path = os.path.commonpath([abs_path, abs_project])
+        return os.path.normcase(common_path) == os.path.normcase(abs_project)
+    except (OSError, ValueError):
         return False
+
+
+def make_localized_item_name(source_library: str, item_name: str) -> str:
+    """
+    @brief Build a deterministic collision-safe local library item name
+
+    @param source_library: Original library nickname
+    @param item_name: Original symbol or footprint name
+    @return Length-bounded filesystem-safe name with a stable source hash
+    """
+    safe_library = re.sub(
+        r'[^A-Za-z0-9_.-]+',
+        '_',
+        source_library
+    ).strip('._') or "library"
+    safe_item = re.sub(
+        r'[<>:"/\\|?*\x00-\x1f]+',
+        '_',
+        item_name
+    ).strip('. ') or "item"
+    digest = hashlib.sha256(
+        f"{source_library}\0{item_name}".encode('utf-8')
+    ).hexdigest()[:10]
+    return f"{safe_library[:48]}__{safe_item[:120]}_{digest}"
+
+
+def make_collision_safe_filename(filename: str, source_key: str) -> str:
+    """
+    @brief Add a stable source hash to a destination filename
+
+    @param filename: Preferred destination filename
+    @param source_key: Stable source path or URL used to distinguish assets
+    @return Filename with a deterministic short hash before the extension
+    """
+    stem, extension = os.path.splitext(filename)
+    safe_stem = re.sub(
+        r'[<>:"/\\|?*\x00-\x1f]+',
+        '_',
+        stem
+    ).strip('. ') or "asset"
+    digest = hashlib.sha256(source_key.encode('utf-8')).hexdigest()[:10]
+    return f"{safe_stem}_{digest}{extension}"
 
 
 class KicadPathResolutionError(Exception):
@@ -121,7 +372,14 @@ class KicadPathResolutionError(Exception):
     the affected asset rather than using a partially-expanded or literal
     "${VAR}" path.
     """
+
     def __init__(self, path: str, variable: str):
+        """
+        @brief Initialize an unresolved KiCad path error
+
+        @param path: Original path containing the unresolved variable
+        @param variable: Variable name that could not be resolved
+        """
         self.path = path
         self.variable = variable
         super().__init__(f"Could not resolve KiCad path variable '${{{variable}}}' in path: {path}")
@@ -255,6 +513,53 @@ def safe_read_file(path: str, encoding: str = 'utf-8', max_size: Optional[int] =
         return f.read()
 
 
+def atomic_write_file(
+    path: str,
+    content: Union[str, bytes],
+    encoding: str = 'utf-8'
+) -> None:
+    """
+    @brief Atomically replace a file with text or binary content
+
+    Writes to a temporary file in the destination directory and then replaces
+    the destination, preventing partially-written KiCad files.
+
+    @param path: Destination file path
+    @param content: Text or binary content to write
+    @param encoding: Text encoding used when content is a string
+
+    @throws OSError if the temporary file cannot be written or replaced
+    @throws UnicodeError if text cannot be encoded
+    """
+    destination = os.path.abspath(path)
+    destination_dir = os.path.dirname(destination)
+    existing_mode = None
+    if os.path.exists(destination):
+        existing_mode = stat.S_IMODE(os.stat(destination).st_mode)
+    file_descriptor, temp_path = tempfile.mkstemp(
+        dir=destination_dir,
+        prefix=f".{os.path.basename(destination)}.",
+        suffix=".tmp"
+    )
+
+    try:
+        if isinstance(content, bytes):
+            with os.fdopen(file_descriptor, 'wb') as temp_file:
+                temp_file.write(content)
+        else:
+            with os.fdopen(file_descriptor, 'w', encoding=encoding) as temp_file:
+                temp_file.write(content)
+        if existing_mode is not None:
+            os.chmod(temp_path, existing_mode)
+        os.replace(temp_path, destination)
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
 def find_schematic_files(project_dir: str) -> list:
     """
     @brief Find all schematic files in project directory including hierarchical sheets
@@ -290,20 +595,14 @@ def scan_schematics_for_items(
     
     Scans all schematic files and extracts items using provided function.
     """
-    def log(level, msg):
-        if logger:
-            method = getattr(logger, level, None)
-            if method:
-                method(msg)
-    
     items = set()
-    log('info', f"{progress_msg}...")
+    log_message(logger, 'info', f"{progress_msg}...")
     
     schematic_files = find_schematic_files(project_dir)
-    log('info', f"Found {len(schematic_files)} schematic file(s)")
+    log_message(logger, 'info', f"Found {len(schematic_files)} schematic file(s)")
     
     for sch_file in schematic_files:
-        log('info', f"  Parsing {os.path.basename(sch_file)}")
+        log_message(logger, 'info', f"  Parsing {os.path.basename(sch_file)}")
         try:
             sexpr = parse_file_with_sexpr(sch_file, parser)
             file_items = extract_func(sexpr)
@@ -312,12 +611,16 @@ def scan_schematics_for_items(
             for item in file_items:
                 # Handle both tuples and single items
                 if isinstance(item, tuple):
-                    log('info', f"    - {':'.join(str(x) for x in item)}")
+                    log_message(logger, 'info', f"    - {':'.join(str(x) for x in item)}")
                 else:
-                    log('info', f"    - {item}")
+                    log_message(logger, 'info', f"    - {item}")
                     
         except Exception as e:
-            log('warning', f"Could not parse {os.path.basename(sch_file)}: {str(e)}")
+            log_message(
+                logger,
+                'warning',
+                f"Could not parse {os.path.basename(sch_file)}: {str(e)}"
+            )
     
     return items
 
@@ -334,4 +637,3 @@ def parse_file_with_sexpr(file_path: str, parser):
     """
     content = safe_read_file(file_path)
     return parser.parse(content)
-

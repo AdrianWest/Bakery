@@ -20,7 +20,6 @@ plugin registration with KiCad and sets up logging for debugging purposes.
 """
 import inspect
 import logging
-import os
 from pathlib import Path
 
 # Setup logging to file in the plugin directory
@@ -42,6 +41,13 @@ logger.info("=" * 80)
 logger.info("Bakery plugin __init__.py loading")
 
 def __is_in_call_stack(function_name: str, module_name: str) -> bool:
+    """
+    @brief Check whether a named function appears in a module's active frame
+
+    @param function_name: Function name to locate
+    @param module_name: Module name whose frames should be inspected
+    @return True when the function is present in a matching frame
+    """
     current_stack = inspect.stack()
     result = False
 
@@ -56,8 +62,6 @@ def __is_in_call_stack(function_name: str, module_name: str) -> bool:
 
 
 try:
-    import pcbnew
-
     if __is_in_call_stack("LoadPluginModule", "pcbnew"):
         logger.info("Loading Bakery plugin...")
         from .bakery_plugin import BakeryPlugin

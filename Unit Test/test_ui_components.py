@@ -5,10 +5,7 @@ Tests UI dialog and logger window components.
 Note: wxPython is mocked since it may not be available outside KiCad.
 """
 
-import sys
-import os
 import unittest
-from unittest.mock import Mock, MagicMock, patch
 
 # Use import helper for modules with relative imports
 from import_helper import import_bakery_module
@@ -30,14 +27,14 @@ class TestConfigDialog(unittest.TestCase):
         CONFIG_SYMBOL_LIB_NAME = constants.CONFIG_SYMBOL_LIB_NAME
         CONFIG_SYMBOL_DIR_NAME = constants.CONFIG_SYMBOL_DIR_NAME
         CONFIG_MODELS_DIR_NAME = constants.CONFIG_MODELS_DIR_NAME
-        CONFIG_CREATE_BACKUPS = constants.CONFIG_CREATE_BACKUPS
+        CONFIG_DATASHEETS_DIR_NAME = constants.CONFIG_DATASHEETS_DIR_NAME
         
         # Config keys should be strings
         self.assertIsInstance(CONFIG_LOCAL_LIB_NAME, str)
         self.assertIsInstance(CONFIG_SYMBOL_LIB_NAME, str)
         self.assertIsInstance(CONFIG_SYMBOL_DIR_NAME, str)
         self.assertIsInstance(CONFIG_MODELS_DIR_NAME, str)
-        self.assertIsInstance(CONFIG_CREATE_BACKUPS, str)
+        self.assertIsInstance(CONFIG_DATASHEETS_DIR_NAME, str)
 
 
 class TestBakeryLogger(unittest.TestCase):

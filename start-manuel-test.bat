@@ -2,11 +2,19 @@
 setlocal
 
 set "SOURCE_DIR=%~dp0Functional Test"
-for %%I in ("%~dp0..") do set "DESTINATION_DIR=%%~fI"
+for %%I in ("%~dp0..") do set "DESTINATION_DIR=%%~fI\testing"
 
 if not exist "%SOURCE_DIR%\" (
     echo ERROR: Functional Test folder not found: "%SOURCE_DIR%"
     exit /b 1
+)
+
+if not exist "%DESTINATION_DIR%\" (
+    mkdir "%DESTINATION_DIR%"
+    if errorlevel 1 (
+        echo ERROR: Could not create testing folder: "%DESTINATION_DIR%"
+        exit /b 1
+    )
 )
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^

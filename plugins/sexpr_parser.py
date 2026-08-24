@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file sexpr_parser.py
 
 @brief S-expression parser for KiCad file formats
@@ -39,7 +36,7 @@ for symbol libraries and symbol definitions to maintain KiCad's expected formatt
 - Preserves KiCad formatting conventions for symbols and libraries
 """
 
-from typing import List, Union, Any, Optional
+from typing import List, Union
 from collections import OrderedDict
 from .constants import (
     SEXPR_FP_LIB_TABLE, SEXPR_SYM_LIB_TABLE, SEXPR_LIB, SEXPR_LIB_SYMBOLS, SEXPR_SYMBOL,
@@ -235,6 +232,11 @@ class SExpressionParser:
         footprints = set()
         
         def search(node):
+            """
+            @brief Recursively collect footprint property references
+
+            @param node: Current S-expression node
+            """
             if isinstance(node, list):
                 # Look for (property "Footprint" "Library:Footprint")
                 if len(node) >= 3 and node[0] == SEXPR_PROPERTY:
@@ -263,6 +265,11 @@ class SExpressionParser:
         models = []
         
         def search_models(node):
+            """
+            @brief Recursively collect 3D model references
+
+            @param node: Current S-expression node
+            """
             if isinstance(node, list) and len(node) > 0:
                 if node[0] == SEXPR_MODEL:
                     # Found a model entry, extract the path
@@ -288,6 +295,12 @@ class SExpressionParser:
         @return Library URI string or None if not found
         """
         def search_lib(node):
+            """
+            @brief Recursively locate a named library entry
+
+            @param node: Current S-expression node
+            @return Library URI string or None if not found
+            """
             if isinstance(node, list) and len(node) > 0:
                 if node[0] == SEXPR_LIB:
                     # Found a library entry, check if it's the one we want
@@ -389,7 +402,11 @@ class SExpressionParser:
             return ''.join(parts)
         
         # Special handling for symbol keyword - name stays on same line
-        if keyword == 'symbol' and len(sexpr) > 1 and not isinstance(sexpr[1], list):
+        if (
+            keyword == SEXPR_SYMBOL
+            and len(sexpr) > 1
+            and not isinstance(sexpr[1], list)
+        ):
             result = ['(symbol ' + str(sexpr[1])]
             for item in sexpr[2:]:
                 if isinstance(item, list):

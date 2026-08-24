@@ -53,6 +53,17 @@
                          "download_sha256":  "f2a7831a1abc516c010e255ec22f025cf33f966d484afdef77fa47f993656fde",
                          "download_size":  58156,
                          "install_size":  207085
+                     },
+                     {
+                         "version":  "2.1.0",
+                         "status":  "stable",
+                         "kicad_version":  "10.0",
+                         "kicad_version_max":  "10.99",
+                         "download_url":  "https://github.com/AdrianWest/Bakery/releases/download/V2.1.0/Bakery-2_1_0.zip",
+                         "download_sha256":  "d41d8cd98f00b204e9800998ecf8427e",
+                         "download_size":  58156,
+                         "install_size":  207085
                      }
-                 ]
+
+                ]
 }

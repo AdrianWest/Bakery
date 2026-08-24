@@ -1,3 +1,5 @@
+![Bakery KiCad Plugin banner](resources/Banner-No-robot.png)
+
 # Bakery - KiCad Plugin
 
 **Localize all KiCad symbols, footprints, 3D models, and datasheets to project libraries - They get Baked into your project**
@@ -13,7 +15,7 @@
 **Why?**
 - Bakery modifies `.kicad_sch` and `.kicad_pcb` files extensively
 - The easiest way to recover from an unwanted conversion is to revert from Git
-- Bakery does not create automatic backups; use Git or your own versioning workflow for safety
+- Bakery creates a KiCad-style ZIP backup before localization, but Git remains recommended for complete history
 
 **Quick Git setup (if you don't have one):**
 ```bash
@@ -71,15 +73,31 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
    - Datasheets directory name (default: "Data_Sheets")
 4. Confirm the operation
 5. The plugin will:
+   - Create `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip`
    - Create local `.pretty` folders for footprints
    - Create local symbol library (`.kicad_sym`) in Symbols directory
    - Create local `3D Models` folder for 3D models
    - Create local `Data_Sheets` folder for datasheets
    - Copy all used symbols, footprints, and their associated 3D models
    - Download datasheets from internet URLs and copy local datasheet files into the project datasheet folder
+   - Scan and localize datasheet references from both schematic and PCB files
    - Update `fp-lib-table` and `sym-lib-table` to include local libraries
    - Update references in both PCB and schematic files to point to local libraries
-   - Leave files in place without creating automatic backups
+   - Abort before making changes if the project backup cannot be created
+
+## Restoring a Bakery Backup with KiCad
+
+Bakery backups are standard ZIP project archives and can be restored with
+KiCad's built-in **Unarchive Project** command:
+
+1. Close the project you want to restore.
+2. In the KiCad Project Manager, select **File** > **Unarchive Project...**.
+3. Select the desired ZIP from the project's `<project>-backups` folder.
+4. Choose the folder where KiCad should restore the archived project.
+5. Open the restored `.kicad_pro` file and verify the project before replacing
+   or deleting the current copy.
+
+![KiCad File menu highlighting Unarchive Project](resources/KiCad-Restor.png)
 
 ## Project Structure After Localization
 
@@ -88,6 +106,8 @@ YourProject/
 ├── YourProject.kicad_pro
 ├── YourProject.kicad_pcb
 ├── YourProject.kicad_sch
+├── YourProject-backups/      # Timestamped pre-localization project archives
+│   └── YourProject-YYYY-MM-DD_HHMMSS.zip
 ├── fp-lib-table              # Updated with local footprint library
 ├── sym-lib-table             # Updated with local symbol library
 ├── MyLib.pretty/             # Local footprint library
@@ -120,7 +140,6 @@ Bakery/
 ├── data_sheet_localizer.py     # Datasheet localization (download/copy/update)
 ├── library_manager.py          # Footprint library table management
 ├── sexpr_parser.py             # S-expression parser
-├── backup_manager.py           # File backup utilities
 ├── utils.py                    # Shared utility functions
 └── metadata.json               # Plugin metadata for KiCad Plugin Manager
 ```
@@ -139,13 +158,13 @@ Bakery/
 
    ✅ **Dual Scanning**: Scans both PCB and schematic files for complete coverage
 
-   ✅ **No Automatic Backups**: The plugin intentionally does not create automatic backups; use Git or your own backup workflow
+   ✅ **Automatic Project Backup**: Creates a KiCad-compatible timestamped ZIP before changing project files
 
    ✅ **Progress Tracking**: Visual progress bar with step-by-step status
 
    ✅ **Detailed Logging**: Separate panes for info, warnings, and errors
 
-   ✅ **Configurable**: Choose library names, directories, and backup options
+   ✅ **Configurable**: Choose local library and directory names
 
    ✅ **Path Safety**: Validates all file operations to prevent data loss
 
@@ -166,7 +185,7 @@ When you run Bakery, you can configure:
 - **Symbol Directory Name**: Name for the symbol library directory (default: "Symbols")
 - **3D Models Folder**: Name for the 3D models folder (default: "3D Models")
 - **Datasheets Directory Name**: Name for the local datasheets folder (default: "Data_Sheets")
-- **Automatic Backups**: Disabled by design; use Git or an external backup workflow for recovery
+- **Automatic Project Backup**: Mandatory and created in `<project>-backups`
 
 ## License
 
@@ -202,9 +221,8 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 - [x] Bug fixes in S-expression parser property name handling
 - [x] Bug fixes in file read error handling for missing files
 
-### v2.0.0 - KiCad 10 Support and Backup Policy Update
+### v2.0.0 - KiCad 10 Support
 - [x] KiCad 10 project compatibility
-- [x] No automatic backups by default
 - [x] Support for KiCad 10 projects still referencing 9.x global libraries
 
 ### Planned for Future Versions
@@ -215,7 +233,7 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 
 ### Unit Tests
 
-Run the comprehensive unit test suite (232 tests covering all modules):
+Run the comprehensive unit test suite (215 tests covering all modules):
 
 ```bash
 cd "Unit Test"
@@ -226,8 +244,8 @@ python run_tests.py --list       # List all available tests
 ```
 
 **Test Coverage:**
-- ✅ 232 tests across 11 test modules
-- ✅ All modules covered: constants, utils, sexpr_parser, backup_manager, library_manager, base_localizer, footprint_localizer, symbol_localizer, data_sheet_localizer, ui_components, bakery_plugin
+- ✅ 215 tests across 11 test modules
+- ✅ All modules covered: constants, utils, sexpr_parser, library_manager, base_localizer, footprint_localizer, symbol_localizer, data_sheet_localizer, ui_components, bakery_plugin
 - ✅ 0 failures, 0 errors, 0 skipped
 
 See [Unit Test/README.md](Unit%20Test/README.md) for detailed testing documentation.
@@ -267,13 +285,13 @@ Two functional test projects are provided in `Functional Test/`:
 After running the plugin, verify the following:
 
 **In the Schematic (`.kicad_sch`):**
-- [ ] All symbol `lib_id` fields now reference the local library (e.g., `"MySymbols:R"` instead of `"Device:R"`)
+- [ ] All symbol `lib_id` fields now reference collision-safe local names with stable hash suffixes (e.g., `"MySymbols:Device__R_<hash>"` instead of `"Device:R"`)
 - [ ] Symbol properties are preserved (reference designators, values, etc.)
 - [ ] Schematic visual appearance is unchanged
 - [ ] No missing symbols or broken references
 
 **In the PCB (`.kicad_pcb`):**
-- [ ] All footprint `fp_text` references updated to local library (e.g., `"MyLib:R_0805"`)
+- [ ] All footprint references use collision-safe local names with stable hash suffixes (e.g., `"MyLib:Resistor_SMD__R_0805_<hash>"`)
 - [ ] 3D model paths updated to `${KIPRJMOD}/3D Models/` for copied models
 - [ ] Footprint positions, rotations, and layers unchanged
 - [ ] Copper traces, zones, and routing intact
@@ -283,7 +301,7 @@ After running the plugin, verify the following:
 - [ ] `fp-lib-table` contains entry for local footprint library
 - [ ] `sym-lib-table` contains entry for local symbol library
 - [ ] Local libraries created: `MyLib.pretty/`, `Symbols/MySymbols.kicad_sym`, `3D Models/`, `Data_Sheets/`
-- [ ] Backup files created with timestamps (if enabled)
+- [ ] `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip` created before localization
 - [ ] All footprints copied to `MyLib.pretty/`
 - [ ] All symbols present in `Symbols/MySymbols.kicad_sym`
 - [ ] 3D models copied to `3D Models/` folder

@@ -9,6 +9,7 @@ import os
 import unittest
 import tempfile
 import shutil
+import stat
 
 # Use import helper for modules with relative imports
 from import_helper import import_bakery_module
@@ -19,7 +20,9 @@ validate_path_safety = utils.validate_path_safety
 expand_kicad_path = utils.expand_kicad_path
 KicadPathResolutionError = utils.KicadPathResolutionError
 safe_read_file = utils.safe_read_file
+atomic_write_file = utils.atomic_write_file
 find_schematic_files = utils.find_schematic_files
+make_localized_item_name = utils.make_localized_item_name
 scan_schematics_for_items = utils.scan_schematics_for_items
 
 
@@ -122,6 +125,80 @@ class TestValidatePathSafety(unittest.TestCase):
         for path in unsafe_paths:
             with self.subTest(path=path):
                 self.assertFalse(validate_path_safety(path, self.project_dir))
+
+    def test_sibling_with_project_name_prefix_is_rejected(self):
+        """Test that string-prefix siblings are not treated as project children"""
+        sibling_path = os.path.join(self.temp_dir, "project-backup", "file.txt")
+        self.assertFalse(validate_path_safety(sibling_path, self.project_dir))
+
+
+class TestAtomicWriteFile(unittest.TestCase):
+    """Test suite for atomic_write_file function"""
+
+    def setUp(self):
+        """Create a temporary destination path"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.dest_path = os.path.join(self.temp_dir, "output.kicad_sch")
+
+    def tearDown(self):
+        """Clean up temporary files"""
+        shutil.rmtree(self.temp_dir)
+
+    def test_writes_and_replaces_text_content(self):
+        """Test that text destinations are atomically replaced"""
+        atomic_write_file(self.dest_path, "first")
+        atomic_write_file(self.dest_path, "second")
+        self.assertEqual(safe_read_file(self.dest_path), "second")
+
+    def test_writes_binary_content(self):
+        """Test that binary content is written unchanged"""
+        content = b"%PDF-1.4 test"
+        atomic_write_file(self.dest_path, content)
+        with open(self.dest_path, "rb") as destination:
+            self.assertEqual(destination.read(), content)
+
+    @unittest.skipIf(os.name == 'nt', "POSIX mode bits are not enforced on Windows")
+    def test_preserves_existing_file_mode(self):
+        """Test that atomic replacement preserves POSIX permissions"""
+        with open(self.dest_path, 'w', encoding='utf-8') as destination:
+            destination.write("first")
+        os.chmod(self.dest_path, 0o640)
+
+        atomic_write_file(self.dest_path, "second")
+
+        mode = stat.S_IMODE(os.stat(self.dest_path).st_mode)
+        self.assertEqual(mode, 0o640)
+
+
+class TestLocalizedItemNames(unittest.TestCase):
+    """Test suite for collision-safe localized names"""
+
+    def test_ambiguous_and_sanitized_sources_remain_distinct(self):
+        """Test that readable prefixes cannot create identifier collisions"""
+        names = {
+            make_localized_item_name("A", "B__C"),
+            make_localized_item_name("A__B", "C"),
+            make_localized_item_name("A/B", "R"),
+            make_localized_item_name("A?B", "R"),
+            make_localized_item_name("Library", "Part"),
+            make_localized_item_name("library", "Part")
+        }
+        self.assertEqual(len(names), 6)
+
+
+class TestFindSchematicFiles(unittest.TestCase):
+    """Test suite for recursive schematic discovery"""
+
+    def test_finds_hierarchical_schematic(self):
+        """Test that schematics in child directories are included"""
+        with tempfile.TemporaryDirectory() as project_dir:
+            child_dir = os.path.join(project_dir, "sheets")
+            os.makedirs(child_dir)
+            child_sheet = os.path.join(child_dir, "child.kicad_sch")
+            with open(child_sheet, 'w', encoding='utf-8') as schematic:
+                schematic.write("(kicad_sch)")
+
+            self.assertEqual(find_schematic_files(project_dir), [child_sheet])
 
 
 class TestExpandKicadPath(unittest.TestCase):

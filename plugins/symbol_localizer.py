@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file symbol_localizer.py
 
 @brief Symbol localization for Bakery plugin
@@ -36,30 +33,27 @@ libraries. It parses .kicad_sch files, extracts symbol definitions from global
 - Supports KiCad 10 environment variable formats; legacy KICAD9_* tokens in
   existing project files are normalized to KICAD10_* as input migration only
 - Handles both absolute and relative library paths
-- Creates backups before modifying schematic files
 """
 
 import os
-import shutil
-import glob
-from datetime import datetime
+import copy
+import re
 from typing import Set, Tuple, List, Optional, Callable
 
 from .constants import (
-    EXTENSION_SYMBOL, EXTENSION_SCHEMATIC, EXTENSION_SYM_LIB_TABLE,
-    SEXPR_SYMBOL, SEXPR_LIB_SYMBOLS, SEXPR_LIB_ID, SEXPR_NAME, SEXPR_TYPE,
-    SEXPR_URI, SEXPR_OPTIONS, SEXPR_DESCR, SEXPR_LIB, SEXPR_SYM_LIB_TABLE,
-    LIBRARY_TYPE_KICAD, PROGRESS_STEP_SCAN_SYMBOLS, PROGRESS_STEP_COPY_SYMBOLS,
-    PROGRESS_STEP_UPDATE_SYM_LIB_TABLE, ENV_VAR_KIPRJMOD,
-    KICAD_VERSION_PRIMARY,
+    EXTENSION_SYMBOL, EXTENSION_SYM_LIB_TABLE,
+    SEXPR_SYMBOL, SEXPR_LIB_SYMBOLS, SEXPR_LIB_ID, SEXPR_SYM_LIB_TABLE,
+    SEXPR_EXTENDS, SEXPR_GENERATOR, SEXPR_GENERATOR_VERSION, SEXPR_VERSION,
+    PROGRESS_STEP_SCAN_SYMBOLS, PROGRESS_STEP_COPY_SYMBOLS, ENV_VAR_KIPRJMOD,
     KICAD_SYMBOL_VERSION, KICAD_GENERATOR_NAME, KICAD_GENERATOR_VERSION,
     LIB_SYMBOLS_METADATA_COUNT
 )
 from .base_localizer import BaseLocalizer
+from .sexpr_parser import SExpressionParseError
 from .utils import (
-    expand_kicad_path, safe_read_file, find_schematic_files,
-    scan_schematics_for_items, validate_path_safety, KicadPathResolutionError,
-    get_kicad_table_paths
+    atomic_write_file, make_localized_item_name, resolve_library_path,
+    safe_read_file, scan_schematics_for_items, update_library_table,
+    validate_path_safety
 )
 
 
@@ -80,7 +74,6 @@ class SymbolLocalizer(BaseLocalizer):
     - :py:meth:`~SymbolLocalizer.get_symbols_in_library`
     - :py:meth:`~SymbolLocalizer.extract_symbol_from_library`
     - :py:meth:`~SymbolLocalizer.find_symbol_library_path`
-    - :py:meth:`~SymbolLocalizer.expand_path`
     - :py:meth:`~SymbolLocalizer.write_symbol_library`
     - :py:meth:`~SymbolLocalizer.update_schematic_references`
     - :py:meth:`~SymbolLocalizer.update_sym_lib_table`
@@ -88,7 +81,6 @@ class SymbolLocalizer(BaseLocalizer):
     @section attributes Attributes
     - logger (Callable): Logger object with info/warning/error methods (inherited)
     - parser (SExpressionParser): S-expression parser instance (inherited)
-    - backup_manager (BackupManager): File backup manager instance (inherited)
     """
     
     def __init__(self, logger: Optional[Callable] = None):
@@ -102,10 +94,18 @@ class SymbolLocalizer(BaseLocalizer):
     def scan_schematic_symbols(self, project_dir: str) -> Set[Tuple[str, str]]:
         """
         @brief Scan schematic files for symbol references
+
+        @param project_dir: Project directory containing schematic files
+        @return Set of (library, symbol) tuples excluding power symbols
         """
         
         def extract_and_filter_symbols(sexpr):
-            """Extract symbols and filter out power library"""
+            """
+            @brief Extract symbols while excluding the power library
+
+            @param sexpr: Parsed schematic S-expression
+            @return Set of non-power (library, symbol) tuples
+            """
             symbols = self.find_symbols_in_sexpr(sexpr)
             # Filter out power library symbols
             return {(lib, sym) for lib, sym in symbols if lib.lower() != 'power'}
@@ -130,6 +130,11 @@ class SymbolLocalizer(BaseLocalizer):
         symbols = set()
         
         def search(node):
+            """
+            @brief Recursively collect symbol references
+
+            @param node: Current S-expression node
+            """
             if isinstance(node, list) and len(node) >= 2:
                 # Look for (symbol (lib_id "Library:Symbol") ...)
                 if node[0] == SEXPR_SYMBOL:
@@ -151,7 +156,7 @@ class SymbolLocalizer(BaseLocalizer):
         return symbols
     
     def copy_symbols(self, symbols: Set[Tuple[str, str]], project_dir: str, 
-                    symbol_lib_name: str, symbol_dir_name: str) -> List[Tuple[str, str, str]]:
+                    symbol_lib_name: str, symbol_dir_name: str) -> List[Tuple[str, str, str, Optional[list]]]:
         """
         @brief Copy symbols from global libraries to local library
         
@@ -159,7 +164,8 @@ class SymbolLocalizer(BaseLocalizer):
         @param project_dir: Project directory path
         @param symbol_lib_name: Name for the local symbol library
         @param symbol_dir_name: Name for the symbol directory
-        @return List of (lib_name, symbol_name, symbol_content) tuples that were copied
+        @return List of source library, source name, target name, and optional
+                symbol content tuples available for reference updates
         """
         self.log('info', PROGRESS_STEP_COPY_SYMBOLS + "...")
         
@@ -185,12 +191,11 @@ class SymbolLocalizer(BaseLocalizer):
         existing_symbols = set()
         if os.path.exists(symbol_lib_path):
             try:
-                with open(symbol_lib_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                content = safe_read_file(symbol_lib_path)
                 sexpr = self.parser.parse(content)
                 existing_symbols = self.get_symbols_in_library(sexpr)
                 self.log('info', f"Found {len(existing_symbols)} existing symbols in {symbol_lib_name}")
-            except Exception as e:
+            except (OSError, ValueError, SExpressionParseError) as e:
                 self.log('warning', f"Could not read existing library: {e}")
         
         for lib_name, sym_name in symbols:
@@ -198,9 +203,11 @@ class SymbolLocalizer(BaseLocalizer):
             if lib_name.lower() == 'power':
                 self.log('info', f"  → Skipping {lib_name}:{sym_name} (power library)")
                 skipped_count += 1
-            # Skip if already in local library
-            elif sym_name in existing_symbols:
-                self.log('info', f"  → Skipping {lib_name}:{sym_name} (already in local library)")
+            elif lib_name == symbol_lib_name:
+                self.log(
+                    'info',
+                    f"  → Skipping {lib_name}:{sym_name} (already local)"
+                )
                 skipped_count += 1
             else:
                 symbols_to_copy.add((lib_name, sym_name))
@@ -214,9 +221,9 @@ class SymbolLocalizer(BaseLocalizer):
         # same library file.
         copied_count = 0
         failed_count = 0
-        copied_symbols = []
+        localized_symbols = []
         symbol_contents = []
-        work_queue = list(symbols_to_copy)
+        work_queue = sorted(symbols_to_copy)
         processed = set()
         
         while work_queue:
@@ -224,22 +231,53 @@ class SymbolLocalizer(BaseLocalizer):
             if (lib_name, sym_name) in processed:
                 continue
             processed.add((lib_name, sym_name))
+            target_name = make_localized_item_name(lib_name, sym_name)
+
+            if target_name in existing_symbols:
+                self.log(
+                    'info',
+                    f"  → Reusing {symbol_lib_name}:{target_name}"
+                )
+                localized_symbols.append(
+                    (lib_name, sym_name, target_name, None)
+                )
+                continue
             
             try:
                 # Find and extract the symbol from global library
                 symbol_data = self.extract_symbol_from_library(lib_name, sym_name, project_dir)
                 
                 if symbol_data:
-                    self.log('info', f"  ✓ Extracted {lib_name}:{sym_name}")
+                    parent_name = self.get_symbol_parent(symbol_data)
+                    localized_data = self.rename_symbol_for_local_library(
+                        symbol_data,
+                        lib_name,
+                        sym_name,
+                        target_name,
+                        parent_name
+                    )
+                    self.log(
+                        'info',
+                        f"  ✓ Extracted {lib_name}:{sym_name} as {target_name}"
+                    )
                     copied_count += 1
-                    copied_symbols.append((lib_name, sym_name))
-                    symbol_contents.append(symbol_data)
+                    localized_symbols.append(
+                        (lib_name, sym_name, target_name, localized_data)
+                    )
+                    symbol_contents.append(localized_data)
                     
                     # Queue the parent symbol if this symbol extends one and
                     # it is not already present in the local library
-                    parent_name = self.get_symbol_parent(symbol_data)
-                    if parent_name and parent_name not in existing_symbols \
-                            and (lib_name, parent_name) not in processed:
+                    parent_target = (
+                        make_localized_item_name(lib_name, parent_name)
+                        if parent_name
+                        else None
+                    )
+                    if (
+                        parent_name
+                        and parent_target not in existing_symbols
+                        and (lib_name, parent_name) not in processed
+                    ):
                         self.log('info', f"    → Queuing parent symbol {lib_name}:{parent_name}")
                         work_queue.append((lib_name, parent_name))
                 else:
@@ -252,7 +290,7 @@ class SymbolLocalizer(BaseLocalizer):
         
         # Write all copied symbols to the local library file
         if symbol_contents:
-            self.write_symbol_library(symbol_lib_path, symbol_lib_name, symbol_contents, existing_symbols)
+            self.write_symbol_library(symbol_lib_path, symbol_contents)
             self.log('success', f"Copied {copied_count} symbols to {symbol_lib_name}{EXTENSION_SYMBOL}")
         else:
             self.log('info', f"No new symbols to add to library")
@@ -260,10 +298,59 @@ class SymbolLocalizer(BaseLocalizer):
         if failed_count > 0:
             self.log('warning', f"{failed_count} symbols could not be copied")
         
-        # Return list of (lib, sym, content) for reference updating
-        return list(zip([x[0] for x in copied_symbols], 
-                       [x[1] for x in copied_symbols],
-                       symbol_contents))
+        return localized_symbols
+
+    def rename_symbol_for_local_library(
+        self,
+        symbol_data: list,
+        source_library: str,
+        source_name: str,
+        target_name: str,
+        parent_name: Optional[str] = None
+    ) -> list:
+        """
+        @brief Rename a symbol definition for collision-safe local storage
+
+        @param symbol_data: Source symbol S-expression
+        @param source_library: Original library nickname
+        @param source_name: Original symbol name
+        @param target_name: Local collision-safe symbol name
+        @param parent_name: Optional source parent symbol name
+        @return Deep-copied and renamed symbol S-expression
+        """
+        localized_data = copy.deepcopy(symbol_data)
+        target_parent = (
+            make_localized_item_name(source_library, parent_name)
+            if parent_name
+            else None
+        )
+
+        def rename(node):
+            """
+            @brief Recursively rename symbol and extends nodes
+
+            @param node: Current S-expression node
+            """
+            if not isinstance(node, list) or not node:
+                return
+            if node[0] == SEXPR_SYMBOL and len(node) >= 2:
+                item_name = node[1].strip('"').strip("'")
+                if (
+                    item_name == source_name
+                    or item_name.startswith(f"{source_name}_")
+                ):
+                    node[1] = f'"{target_name}{item_name[len(source_name):]}"'
+            elif (
+                node[0] == SEXPR_EXTENDS
+                and len(node) >= 2
+                and target_parent
+            ):
+                node[1] = f'"{target_parent}"'
+            for child in node[1:]:
+                rename(child)
+
+        rename(localized_data)
+        return localized_data
     
     def get_symbols_in_library(self, sexpr) -> Set[str]:
         """
@@ -297,7 +384,11 @@ class SymbolLocalizer(BaseLocalizer):
         """
         if isinstance(symbol_sexpr, list):
             for item in symbol_sexpr:
-                if isinstance(item, list) and len(item) >= 2 and item[0] == 'extends':
+                if (
+                    isinstance(item, list)
+                    and len(item) >= 2
+                    and item[0] == SEXPR_EXTENDS
+                ):
                     return item[1].strip('"').strip("'")
         return None
     
@@ -319,9 +410,7 @@ class SymbolLocalizer(BaseLocalizer):
                 self.log('warning', f"    Library not found: {lib_name}")
                 return None
             
-            # Read library file
-            with open(lib_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            content = safe_read_file(lib_path)
             
             # Parse library
             sexpr = self.parser.parse(content)
@@ -337,7 +426,7 @@ class SymbolLocalizer(BaseLocalizer):
             
             return None
             
-        except Exception as e:
+        except (OSError, ValueError, SExpressionParseError) as e:
             self.log('error', f"    Exception extracting symbol: {str(e)}")
             return None
     
@@ -349,106 +438,54 @@ class SymbolLocalizer(BaseLocalizer):
         @param project_dir: Optional project directory whose table takes precedence
         @return Absolute path to .kicad_sym file or None if not found
         """
-        try:
-            # Use the active project/configuration tables first.
-            possible_table_paths = get_kicad_table_paths(EXTENSION_SYM_LIB_TABLE, project_dir)
-            
-            visited_tables = set()
-
-            def find_in_table(table_path: str) -> Optional[str]:
-                if table_path in visited_tables or not os.path.exists(table_path):
-                    return None
-                visited_tables.add(table_path)
-                self.log('info', f"Checking sym-lib-table: {table_path}")
-                with open(table_path, 'r', encoding='utf-8') as f:
-                    table_sexpr = self.parser.parse(f.read())
-                found = self.parser.find_library_path(table_sexpr, lib_name)
-                if found:
-                    return found
-                delegate_uri = self.parser.find_library_path(table_sexpr, "KiCad")
-                if delegate_uri:
-                    try:
-                        return find_in_table(expand_kicad_path(delegate_uri, project_dir))
-                    except KicadPathResolutionError as e:
-                        self.log('warning', f"Could not resolve delegated sym-lib-table: {e}")
-                return None
-
-            lib_path = None
-            for table_path in possible_table_paths:
-                lib_path = find_in_table(table_path)
-                if lib_path:
-                    break
-            
-            if not lib_path:
-                return None
-            
-            # Expand environment variables
-            try:
-                expanded_path = self.expand_path(lib_path, project_dir)
-            except KicadPathResolutionError:
-                return None
-            
-            return expanded_path
-                    
-        except Exception as e:
-            return None
+        return resolve_library_path(
+            EXTENSION_SYM_LIB_TABLE,
+            lib_name,
+            self.parser,
+            self.logger,
+            project_dir
+        )
     
-    def expand_path(self, path: str, project_dir: Optional[str] = None) -> str:
-        """
-        @brief Expand environment variables in a path
-
-        Delegates to the single shared resolver in utils.py so footprints,
-        symbols, 3D models, and datasheets all resolve paths identically.
-        
-        @param path: Path with ${VAR_NAME} placeholders
-        @return Expanded path
-
-        @throws KicadPathResolutionError if a variable cannot be resolved
-        """
-        return expand_kicad_path(path, project_dir)
-    
-    def write_symbol_library(self, lib_path: str, lib_name: str, 
-                            symbol_contents: List[list], existing_symbols: Set[str]):
+    def write_symbol_library(
+        self,
+        lib_path: str,
+        symbol_contents: List[list]
+    ) -> None:
         """
         @brief Write symbols to a library file
         
         @param lib_path: Path to the library file
-        @param lib_name: Library name
         @param symbol_contents: List of symbol S-expressions to add
-        @param existing_symbols: Set of symbol names already in library
         """
         try:
+            empty_library = [
+                SEXPR_LIB_SYMBOLS,
+                [SEXPR_VERSION, KICAD_SYMBOL_VERSION],
+                [SEXPR_GENERATOR, KICAD_GENERATOR_NAME],
+                [SEXPR_GENERATOR_VERSION, KICAD_GENERATOR_VERSION]
+            ]
+
             # Start with library header or read existing file
             if os.path.exists(lib_path):
                 self.log('info', f"Reading existing library file: {lib_path}")
-                with open(lib_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                content = safe_read_file(lib_path)
                 
                 # Check if file is empty or just has whitespace
                 if not content.strip():
                     self.log('warning', f"Existing library file is empty, creating new structure")
-                    lib_sexpr = [SEXPR_LIB_SYMBOLS, 
-                               ['version', KICAD_SYMBOL_VERSION], 
-                               ['generator', KICAD_GENERATOR_NAME], 
-                               ['generator_version', KICAD_GENERATOR_VERSION]]
+                    lib_sexpr = empty_library
                 else:
                     lib_sexpr = self.parser.parse(content)
                     # Validate that it's a proper symbol library
                     if not (isinstance(lib_sexpr, list) and len(lib_sexpr) > 0 and lib_sexpr[0] == SEXPR_LIB_SYMBOLS):
                         self.log('warning', f"Existing file is not a valid symbol library, creating new structure")
-                        lib_sexpr = [SEXPR_LIB_SYMBOLS, 
-                                   ['version', KICAD_SYMBOL_VERSION], 
-                                   ['generator', KICAD_GENERATOR_NAME], 
-                                   ['generator_version', KICAD_GENERATOR_VERSION]]
+                        lib_sexpr = empty_library
                     else:
                         self.log('info', f"Existing library has {len(lib_sexpr) - LIB_SYMBOLS_METADATA_COUNT} symbols")
             else:
                 self.log('info', f"Creating new library file: {lib_path}")
                 # Create new library structure (matching KiCad format)
-                lib_sexpr = [SEXPR_LIB_SYMBOLS, 
-                           ['version', KICAD_SYMBOL_VERSION], 
-                           ['generator', KICAD_GENERATOR_NAME], 
-                           ['generator_version', KICAD_GENERATOR_VERSION]]
+                lib_sexpr = empty_library
             
             # Add new symbols
             symbols_added = 0
@@ -463,29 +500,34 @@ class SymbolLocalizer(BaseLocalizer):
             
             self.log('info', f"Library content size: {len(lib_content)} characters")
             
-            # Write to file
-            with open(lib_path, 'w', encoding='utf-8') as f:
-                f.write(lib_content)
+            atomic_write_file(lib_path, lib_content)
             
             self.log('info', f"Successfully wrote symbol library to {lib_path}")
                 
-        except Exception as e:
+        except (OSError, ValueError, SExpressionParseError) as e:
             self.log('error', f"Failed to write symbol library: {e}")
             raise
     
-    def update_schematic_references(self, copied_symbols: List[Tuple[str, str, list]], 
-                                   project_dir: str, local_lib_name: str, create_backups: bool):
+    def update_schematic_references(
+        self,
+        copied_symbols: List[Tuple[str, str, str, Optional[list]]],
+        project_dir: str,
+        local_lib_name: str
+    ) -> int:
         """
         @brief Update schematic files to use local symbol library
         
-        @param copied_symbols: List of (lib_name, sym_name, sexpr) tuples
+        @param copied_symbols: Localized symbol records including target names
         @param project_dir: Project directory path
         @param local_lib_name: Local library name
-        @param create_backups: Whether to create backups before modifying
+        @return Total number of updated symbol references
+
+        @throws RuntimeError if schematic files are locked
+        @throws OSError if a schematic cannot be updated
         """
         if not copied_symbols:
             self.log('info', "No symbols to update in schematics")
-            return
+            return 0
         
         self.log('info', "Updating schematic symbol library references...")
         
@@ -494,14 +536,14 @@ class SymbolLocalizer(BaseLocalizer):
         
         if not schematic_files:
             self.log('warning', "No schematic files found")
-            return
+            return 0
         
         # Check for locked files
         locked_files = self.check_schematic_locks(project_dir)
         if locked_files:
             self.log('warning', f"The following schematic file(s) appear to be open: {', '.join(locked_files)}")
             self.log('error', "Cannot update schematics - files are locked")
-            return
+            raise RuntimeError("Cannot update locked schematic files")
         
         total_updated = 0
         
@@ -510,23 +552,137 @@ class SymbolLocalizer(BaseLocalizer):
             
             # Build replacement list for this file
             replacements = []
-            for lib_name, sym_name, _ in copied_symbols:
+            for lib_name, sym_name, target_name, _ in copied_symbols:
                 old_ref = f'"{lib_name}:{sym_name}"'
-                new_ref = f'"{local_lib_name}:{sym_name}"'
+                new_ref = f'"{local_lib_name}:{target_name}"'
                 replacements.append((old_ref, new_ref))
             
             try:
-                # Use base class method to update file
-                updated_count = self.update_schematic_file(sch_file, replacements, create_backups)
+                updated_count = self.update_schematic_file(
+                    sch_file,
+                    replacements,
+                    lambda content: self._rename_embedded_symbol_definitions(
+                        content,
+                        copied_symbols,
+                        local_lib_name
+                    )
+                )
                 total_updated += updated_count
                     
             except Exception as e:
                 self.log('error', f"Failed to update {os.path.basename(sch_file)}: {str(e)}")
+                raise
         
         if total_updated > 0:
             self.log('success', f"Updated {total_updated} total symbol reference(s) in schematic files")
         else:
             self.log('info', "No symbol references needed updating in schematics")
+
+        return total_updated
+
+    @staticmethod
+    def _find_sexpr_end(content: str, start: int) -> int:
+        """
+        @brief Find the end of an S-expression while ignoring quoted text.
+
+        @param content: S-expression document text.
+        @param start: Offset of the opening parenthesis.
+        @return Offset immediately after the matching closing parenthesis.
+
+        @throws ValueError if the expression is not balanced.
+        """
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for index in range(start, len(content)):
+            character = content[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif character == '\\':
+                    escaped = True
+                elif character == '"':
+                    in_string = False
+                continue
+
+            if character == '"':
+                in_string = True
+            elif character == '(':
+                depth += 1
+            elif character == ')':
+                depth -= 1
+                if depth == 0:
+                    return index + 1
+
+        raise ValueError("Unbalanced embedded symbol definition")
+
+    def _rename_embedded_symbol_definitions(
+        self,
+        content: str,
+        copied_symbols: List[Tuple[str, str, str, Optional[list]]],
+        local_lib_name: str
+    ) -> tuple:
+        """
+        @brief Rename embedded symbol roots and child units consistently.
+
+        KiCad schematic files embed symbol definitions. A definition root uses
+        `Library:Symbol`, while its child graphics use names such as
+        `Symbol_0_1`. When the root is localized, every child must receive the
+        same new symbol-name prefix.
+
+        @param content: Schematic file content.
+        @param copied_symbols: Localized symbol records.
+        @param local_lib_name: Local symbol library nickname.
+        @return Tuple containing replacement count and updated content.
+        """
+        replacement_count = 0
+
+        for source_library, source_name, target_name, _ in copied_symbols:
+            source_root = f"{source_library}:{source_name}"
+            target_root = f"{local_lib_name}:{target_name}"
+            root_pattern = re.compile(
+                r'(\(symbol\s+")'
+                + re.escape(source_root)
+                + r'(")'
+            )
+            search_offset = 0
+
+            while True:
+                root_match = root_pattern.search(content, search_offset)
+                if root_match is None:
+                    break
+
+                expression_start = root_match.start()
+                expression_end = self._find_sexpr_end(
+                    content,
+                    expression_start
+                )
+                symbol_block = content[expression_start:expression_end]
+                symbol_block, root_count = root_pattern.subn(
+                    rf'\g<1>{target_root}\g<2>',
+                    symbol_block,
+                    count=1
+                )
+                child_pattern = re.compile(
+                    r'(\(symbol\s+")'
+                    + re.escape(source_name)
+                    + r'(_[^"]*")'
+                )
+                symbol_block, child_count = child_pattern.subn(
+                    rf'\g<1>{target_name}\g<2>',
+                    symbol_block
+                )
+
+                content = (
+                    content[:expression_start]
+                    + symbol_block
+                    + content[expression_end:]
+                )
+                replacement_count += root_count + child_count
+                search_offset = expression_start + len(symbol_block)
+
+        return replacement_count, content
     
     def update_sym_lib_table(self, project_dir: str, symbol_lib_name: str, symbol_dir_name: str) -> bool:
         """
@@ -537,85 +693,16 @@ class SymbolLocalizer(BaseLocalizer):
         @param symbol_dir_name: Symbol directory name
         @return True if successful, False otherwise
         """
-        sym_lib_table_path = os.path.join(project_dir, EXTENSION_SYM_LIB_TABLE)
-        
         self.log('info', "Updating project sym-lib-table...")
-        
-        try:
-            # Check if sym-lib-table exists
-            if os.path.exists(sym_lib_table_path):
-                self.log('info', "Found existing sym-lib-table")
-                
-                # Read existing file
-                with open(sym_lib_table_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Parse the S-expression
-                sexpr = self.parser.parse(content)
-                
-                # Check if library already exists and update URI if needed
-                lib_found = False
-                if isinstance(sexpr, list):
-                    for item in sexpr:
-                        if isinstance(item, list) and len(item) > 0 and item[0] == SEXPR_LIB:
-                            lib_entry_name = None
-                            uri_index = None
-                            for i, subitem in enumerate(item):
-                                if isinstance(subitem, list) and len(subitem) >= 2:
-                                    if subitem[0] == SEXPR_NAME:
-                                        lib_entry_name = subitem[1].strip('"').strip("'")
-                                    elif subitem[0] == SEXPR_URI:
-                                        uri_index = i
-                            
-                            if lib_entry_name == symbol_lib_name:
-                                lib_found = True
-                                # Update URI to ensure it points to the correct symbol file
-                                correct_uri = f'"${{{ENV_VAR_KIPRJMOD}}}/{symbol_dir_name}/{symbol_lib_name}{EXTENSION_SYMBOL}"'
-                                if uri_index is not None:
-                                    current_uri = item[uri_index][1].strip('"').strip("'")
-                                    expected = f"${{{ENV_VAR_KIPRJMOD}}}/{symbol_dir_name}/{symbol_lib_name}{EXTENSION_SYMBOL}"
-                                    if current_uri != expected:
-                                        item[uri_index] = [SEXPR_URI, correct_uri]
-                                        self.log('info', f"Updated URI for '{symbol_lib_name}' in sym-lib-table")
-                                break
-                
-                if lib_found:
-                    # Write the updated table
-                    sym_lib_content = self.parser.to_string(sexpr)
-                    with open(sym_lib_table_path, 'w', encoding='utf-8') as f:
-                        f.write(sym_lib_content)
-                    self.log('info', f"Library '{symbol_lib_name}' entry updated in sym-lib-table")
-                    return True
-                
-            else:
-                self.log('info', "Creating new sym-lib-table")
-                # Create new sym-lib-table structure
-                sexpr = [SEXPR_SYM_LIB_TABLE]
-            
-            # Add library entry
-            new_lib_entry = [
-                SEXPR_LIB,
-                [SEXPR_NAME, f'"{symbol_lib_name}"'],
-                [SEXPR_TYPE, f'"{LIBRARY_TYPE_KICAD}"'],
-                [SEXPR_URI, f'"${{{ENV_VAR_KIPRJMOD}}}/{symbol_dir_name}/{symbol_lib_name}{EXTENSION_SYMBOL}"'],
-                [SEXPR_OPTIONS, '""'],
-                [SEXPR_DESCR, '"Local project symbol library"']
-            ]
-            
-            # Add the new library entry to the table
-            if isinstance(sexpr, list) and len(sexpr) > 0:
-                sexpr.append(new_lib_entry)
-            
-            # Convert S-expression back to text
-            sym_lib_content = self.parser.to_string(sexpr)
-            
-            # Write the updated sym-lib-table
-            with open(sym_lib_table_path, 'w', encoding='utf-8') as f:
-                f.write(sym_lib_content)
-            
-            self.log('info', f"Added '{symbol_lib_name}' to project sym-lib-table")
-            return True
-            
-        except Exception as e:
-            self.log('error', f"Failed to update sym-lib-table: {e}")
-            return False
+        return update_library_table(
+            os.path.join(project_dir, EXTENSION_SYM_LIB_TABLE),
+            SEXPR_SYM_LIB_TABLE,
+            symbol_lib_name,
+            (
+                f"${{{ENV_VAR_KIPRJMOD}}}/{symbol_dir_name}/"
+                f"{symbol_lib_name}{EXTENSION_SYMBOL}"
+            ),
+            self.parser,
+            self.logger,
+            "Local project symbol library"
+        )

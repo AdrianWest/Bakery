@@ -15,20 +15,13 @@ Tests the DataSheetLocalizer class including:
 - Full localize_all_datasheets workflow
 """
 
-import sys
 import os
+import http.client
 import time
 import unittest
 import tempfile
 import shutil
 from unittest.mock import patch, MagicMock, mock_open
-
-# Python 3.13 removed the 'cgi' module; stub it before importing the plugin
-# module so that the import succeeds in all Python versions.
-if 'cgi' not in sys.modules:
-    _cgi_stub = MagicMock()
-    _cgi_stub.parse_header.return_value = ('', {})
-    sys.modules['cgi'] = _cgi_stub
 
 # Use import helper for modules with relative imports
 from import_helper import import_bakery_module
@@ -144,11 +137,6 @@ class TestDataSheetLocalizerInit(unittest.TestCase):
         localizer = DataSheetLocalizer(self.temp_dir, logger=self.logger)
         self.assertEqual(localizer.logger, self.logger)
 
-    def test_backup_manager_exists(self):
-        """backup_manager attribute is available (inherited from BaseLocalizer)"""
-        localizer = DataSheetLocalizer(self.temp_dir)
-        self.assertTrue(hasattr(localizer, 'backup_manager'))
-
     def test_parser_exists(self):
         """parser attribute is available (inherited from BaseLocalizer)"""
         localizer = DataSheetLocalizer(self.temp_dir)
@@ -193,6 +181,18 @@ class TestIsWebUrl(unittest.TestCase):
     def test_ftp_not_http(self):
         """ftp:// is NOT treated as a web URL by this helper"""
         self.assertFalse(self.localizer._is_web_url("ftp://example.com/file.pdf"))
+
+    def test_ti_wrapper_url_resolves_to_direct_target(self):
+        """TI gotoUrl wrappers resolve before PDF probing and download."""
+        wrapper = (
+            "https://www.ti.com/general/docs/suppproductinfo.tsp?"
+            "distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2F"
+            "csd17577q3a"
+        )
+        self.assertEqual(
+            self.localizer._normalize_download_url(wrapper),
+            "https://www.ti.com/lit/gpn/csd17577q3a"
+        )
 
 
 # ===========================================================================
@@ -481,6 +481,38 @@ class TestScanSchematicDatasheets(unittest.TestCase):
         for name, _ in result:
             self.assertEqual(name, "schematic")
 
+    def test_finds_direct_pdf_url_in_pcb(self):
+        """PCB footprint Datasheet properties are included."""
+        pcb = os.path.join(self.temp_dir, "test.kicad_pcb")
+        url = (
+            "https://mm.digikey.com/Volume0/opasdata/d220001/medias/"
+            "docus/5484/MCASL32MSB5226MPNA01_SS.pdf"
+        )
+        _write(
+            pcb,
+            f'(footprint "C" (property "Datasheet" "{url}"))'
+        )
+
+        result = self.localizer.scan_pcb_datasheets(pcb)
+
+        self.assertEqual(result, [("PCB", url)])
+
+    def test_finds_datasheet_on_live_board(self):
+        """Open PCB fields are scanned through KiCad's board API."""
+        url = "https://example.com/live-board.pdf"
+        field = MagicMock()
+        field.GetName.return_value = "Datasheet"
+        field.GetText.return_value = url
+        footprint = MagicMock()
+        footprint.GetReference.return_value = "C5"
+        footprint.GetFields.return_value = [field]
+        board = MagicMock()
+        board.GetFootprints.return_value = [footprint]
+
+        result = self.localizer.scan_board_datasheets(board)
+
+        self.assertEqual(result, [("C5", url)])
+
 
 # ===========================================================================
 # TestUpdateFileReferences
@@ -524,6 +556,45 @@ class TestUpdateFileReferences(unittest.TestCase):
         with open(lib, 'r', encoding='utf-8') as fh:
             content = fh.read()
         self.assertIn("${KIPRJMOD}/Data_Sheets/1n4001.pdf", content)
+
+    def test_update_pcb_replaces_url(self):
+        """Downloaded PCB datasheets are rewritten to project-local paths."""
+        pcb = os.path.join(self.temp_dir, "test.kicad_pcb")
+        source = "https://example.com/component.pdf"
+        local = "${KIPRJMOD}/Data_Sheets/component.pdf"
+        _write(
+            pcb,
+            f'(footprint "Part" (property "Datasheet" "{source}"))'
+        )
+
+        result = self.localizer.update_pcb_references(
+            pcb,
+            {source: local}
+        )
+
+        self.assertTrue(result)
+        with open(pcb, 'r', encoding='utf-8') as pcb_file:
+            self.assertIn(local, pcb_file.read())
+
+    def test_update_live_board_replaces_datasheet_field(self):
+        """Open PCB datasheets are changed in memory before board.Save."""
+        source = "https://example.com/component.pdf"
+        local = "${KIPRJMOD}/Data_Sheets/component.pdf"
+        field = MagicMock()
+        field.GetName.return_value = "Datasheet"
+        field.GetText.return_value = source
+        footprint = MagicMock()
+        footprint.GetFields.return_value = [field]
+        board = MagicMock()
+        board.GetFootprints.return_value = [footprint]
+
+        result = self.localizer.update_board_references(
+            board,
+            {source: local}
+        )
+
+        self.assertTrue(result)
+        field.SetText.assert_called_once_with(local)
 
     def test_no_changes_needed_returns_true(self):
         sch = os.path.join(self.temp_dir, "unchanged.kicad_sch")
@@ -593,7 +664,13 @@ class TestCopyDatasheets(unittest.TestCase):
         datasheets = [("C1", self.source_pdf)]
         _, copied_count, datasheet_map = self.localizer.copy_datasheets(datasheets)
         self.assertEqual(copied_count, 1)
-        dest = os.path.join(self.localizer.datasheet_dir_path, "component.pdf")
+        dest = os.path.join(
+            self.project_dir,
+            datasheet_map[self.source_pdf].replace(
+                "${KIPRJMOD}/",
+                ""
+            ).replace("/", os.sep)
+        )
         self.assertTrue(os.path.exists(dest))
 
     def test_returns_datasheet_map_for_local_file(self):
@@ -606,6 +683,25 @@ class TestCopyDatasheets(unittest.TestCase):
         datasheets = [("C1", self.source_pdf), ("C2", self.source_pdf)]
         _, copied_count, _ = self.localizer.copy_datasheets(datasheets)
         self.assertEqual(copied_count, 1)
+
+    def test_same_basename_sources_get_distinct_destinations(self):
+        """Different source PDFs with one basename must not overwrite"""
+        second_dir = os.path.join(self.temp_dir, "second")
+        os.makedirs(second_dir)
+        second_pdf = os.path.join(second_dir, "component.pdf")
+        with open(second_pdf, 'wb') as pdf:
+            pdf.write(b'%PDF-1.4 second component')
+
+        _, copied_count, datasheet_map = self.localizer.copy_datasheets([
+            ("C1", self.source_pdf),
+            ("C2", second_pdf)
+        ])
+
+        self.assertEqual(copied_count, 2)
+        self.assertNotEqual(
+            datasheet_map[self.source_pdf],
+            datasheet_map[second_pdf]
+        )
 
     def test_skips_non_pdf_extension(self):
         txt_file = os.path.join(self.temp_dir, "readme.txt")
@@ -706,7 +802,7 @@ class TestDownloadDatasheet(unittest.TestCase):
 
     @patch('urllib.request.urlopen')
     def test_non_pdf_content_logs_warning(self, mock_urlopen):
-        """Non-PDF data triggers a warning but returns True (file was written)"""
+        """Non-PDF data is rejected without replacing the destination"""
         mock_response = MagicMock()
         mock_response.__enter__ = lambda s: s
         mock_response.__exit__ = MagicMock(return_value=False)
@@ -715,8 +811,45 @@ class TestDownloadDatasheet(unittest.TestCase):
         mock_urlopen.return_value = mock_response
 
         result = self.localizer.download_datasheet("http://example.com/file.pdf", self.dest)
-        self.assertTrue(result)
-        self.assertTrue(any("does not appear to be a PDF" in m for m in self.logger.messages['warning']))
+        self.assertFalse(result)
+        self.assertFalse(os.path.exists(self.dest))
+        self.assertTrue(any("not a valid PDF" in m for m in self.logger.messages['error']))
+
+    @patch('urllib.request.urlopen')
+    def test_incomplete_response_returns_false(self, mock_urlopen):
+        """Truncated HTTP responses are handled as download failures"""
+        mock_response = MagicMock()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_response.read.side_effect = http.client.IncompleteRead(b'%PDF')
+        mock_urlopen.return_value = mock_response
+
+        result = self.localizer.download_datasheet(
+            "http://example.com/file.pdf",
+            self.dest
+        )
+
+        self.assertFalse(result)
+        self.assertFalse(os.path.exists(self.dest))
+
+    @patch('urllib.request.urlopen')
+    def test_content_disposition_filename_without_cgi(self, mock_urlopen):
+        """Content-Disposition filenames are parsed with supported APIs"""
+        mock_response = MagicMock()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_response.headers.get.side_effect = lambda name, default='': {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="vendor.pdf"'
+        }.get(name, default)
+        mock_urlopen.return_value = mock_response
+
+        filename = self.localizer._resolve_url_filename(
+            "http://example.com/download",
+            "U1"
+        )
+
+        self.assertEqual(filename, "vendor.pdf")
 
 
 # ===========================================================================
@@ -756,6 +889,14 @@ class TestLocalizeAllDatasheets(unittest.TestCase):
   )
 )''')
 
+        self.pcb_file = os.path.join(self.project_dir, "test.kicad_pcb")
+        _write(self.pcb_file, f'''\
+(kicad_pcb
+  (footprint "C"
+    (property "Datasheet" "{self.source_pdf.replace(os.sep, "/")}")
+  )
+)''')
+
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
 
@@ -766,8 +907,9 @@ class TestLocalizeAllDatasheets(unittest.TestCase):
 
     def test_datasheet_copied(self):
         self.localizer.localize_all_datasheets([self.sym_lib], [self.sch_file])
-        dest = os.path.join(self.localizer.datasheet_dir_path, "cap.pdf")
-        self.assertTrue(os.path.exists(dest))
+        copied_files = os.listdir(self.localizer.datasheet_dir_path)
+        self.assertEqual(len(copied_files), 1)
+        self.assertTrue(copied_files[0].startswith("cap_"))
 
     def test_references_updated_in_symbol_lib(self):
         self.localizer.localize_all_datasheets([self.sym_lib], [self.sch_file])
@@ -780,6 +922,16 @@ class TestLocalizeAllDatasheets(unittest.TestCase):
         with open(self.sch_file, 'r', encoding='utf-8') as fh:
             content = fh.read()
         self.assertIn("${KIPRJMOD}", content)
+
+    def test_references_updated_in_pcb(self):
+        """Closed PCB files can still be localized through text updates."""
+        self.localizer.localize_all_datasheets(
+            [self.sym_lib],
+            [self.sch_file],
+            [self.pcb_file]
+        )
+        with open(self.pcb_file, 'r', encoding='utf-8') as pcb_file:
+            self.assertIn("${KIPRJMOD}", pcb_file.read())
 
     def test_empty_inputs_returns_zero_zero(self):
         result = self.localizer.localize_all_datasheets([], [])
@@ -799,6 +951,28 @@ class TestLocalizeAllDatasheets(unittest.TestCase):
         _write(empty_sch, "(kicad_sch (version 20231120))")
         result = self.localizer.localize_all_datasheets([empty_lib], [empty_sch])
         self.assertEqual(result, (0, 0))
+
+    def test_reference_update_failure_is_propagated(self):
+        """A failed datasheet reference write aborts the workflow"""
+        self.localizer.scan_symbol_datasheets = MagicMock(
+            return_value=[("C", self.source_pdf)]
+        )
+        self.localizer.copy_datasheets = MagicMock(
+            return_value=(
+                0,
+                1,
+                {self.source_pdf: "${KIPRJMOD}/Data_Sheets/cap.pdf"}
+            )
+        )
+        self.localizer.update_symbol_references = MagicMock(
+            return_value=False
+        )
+
+        with self.assertRaises(RuntimeError):
+            self.localizer.localize_all_datasheets(
+                [self.sym_lib],
+                []
+            )
 
     def test_second_run_skips_already_localised(self):
         """On a second run, ${KIPRJMOD} paths are classified as 'localised' and not re-copied"""

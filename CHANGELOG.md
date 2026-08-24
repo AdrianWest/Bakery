@@ -5,6 +5,55 @@ All notable changes to the Bakery KiCad plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-08-22
+
+### Added
+- Added `Banner-No-robot.png` to the Bakery configuration dialog.
+- Added `Banner-No-BK.png` to the localization log window.
+- Packaged both banner resources in plugin installations and release archives.
+- Added a mandatory KiCad-style timestamped ZIP backup of all visible project contents as the first localization step, excluding the backup folder itself.
+
+### Changed
+- Consolidated logging and parser initialization into shared mixins.
+- Consolidated footprint and symbol library-table resolution into one shared utility.
+- Consolidated footprint and symbol library-table updates into one shared utility.
+- Removed duplicate symbol path-expansion logic.
+- Split the main localization and datasheet workflows into focused helper methods.
+- Replaced repetitive configuration-field construction and validation with data-driven helpers.
+- Standardized modified KiCad files on atomic replacement writes.
+- Replaced repeated S-expression keywords with shared constants.
+- Narrowed leaf-level file, parser, and network exception handling.
+- Simplified localization method signatures by removing unused parameters.
+- Converted all Python module, class, function, and method documentation to valid Doxygen-compatible docstrings.
+- Updated unit tests, release scripts, installation scripts, and project documentation for the refactored architecture.
+
+### Removed
+- Removed the old dormant per-file backup subsystem and its unused configuration plumbing.
+- Removed the unused footprint-library reload implementation.
+- Removed the unused KiCad environment-variable cache.
+- Removed redundant imports, wrappers, and dead test coverage.
+
+### Fixed
+- Corrected project path containment checks so similarly named sibling directories are rejected.
+- Corrected 3D model copy statistics so existing models are not counted as newly copied.
+- Prevented reference rewrites when project library-table updates fail.
+- Prevented sanitized, concatenated, truncated, or case-insensitive symbol and footprint names from colliding by adding deterministic source hashes.
+- Prevented same-named 3D models and datasheets from overwriting each other by using stable source hashes in localized filenames.
+- Restored symbol mappings on reruns when a source-namespaced symbol already exists locally.
+- Added recursive datasheet processing for hierarchical schematics.
+- Replaced the removed Python `cgi` module with supported email-header parsing for Python 3.13 compatibility.
+- Rejected invalid, oversized, and truncated PDF downloads before replacing local files.
+- Resolved project-local `${KIPRJMOD}` model paths without repeatedly copying or renaming them.
+- Preserved POSIX file permissions during atomic file replacement.
+- Added KiCad lock-file and advisory-lock detection before schematic modification.
+- Rechecked lock state and modification timestamps immediately before every schematic or symbol-library replacement.
+- Propagated PCB, symbol, and datasheet reference-update failures instead of reporting partial localization as success.
+- Renamed embedded schematic symbol units together with their localized root
+  symbols, preventing KiCad's `invalid symbol name prefix` load error.
+- Scanned datasheet properties in both schematic and PCB files, including
+  direct PCB-only PDF links, and resolved TI wrapper URLs before downloading.
+- Corrected completion totals so reused symbols and already-local footprints are not reported as newly copied.
+
 ## [1.1.0] - 2026-02-22
 
 ### Added

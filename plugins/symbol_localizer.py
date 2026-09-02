@@ -189,29 +189,55 @@ class SymbolLocalizer(BaseLocalizer):
         
         # Check if local library exists and what symbols it contains
         existing_symbols = set()
+        local_library_readable = False
         if os.path.exists(symbol_lib_path):
             try:
                 content = safe_read_file(symbol_lib_path)
                 sexpr = self.parser.parse(content)
                 existing_symbols = self.get_symbols_in_library(sexpr)
+                local_library_readable = True
                 self.log('info', f"Found {len(existing_symbols)} existing symbols in {symbol_lib_name}")
             except (OSError, ValueError, SExpressionParseError) as e:
                 self.log('warning', f"Could not read existing library: {e}")
         
+        dangling_symbols = []
         for lib_name, sym_name in symbols:
             # Skip power library symbols
             if lib_name.lower() == 'power':
                 self.log('info', f"  → Skipping {lib_name}:{sym_name} (power library)")
                 skipped_count += 1
             elif lib_name == symbol_lib_name:
-                self.log(
-                    'info',
-                    f"  → Skipping {lib_name}:{sym_name} (already local)"
-                )
-                skipped_count += 1
+                # A reference to the local library is only genuinely "already
+                # local" when that symbol really is present in the local
+                # library file. Trusting the library nickname alone would
+                # silently report success for a dangling reference - for
+                # example a project whose symbol directory was deleted or was
+                # never copied alongside the schematic - and leave the user
+                # with a project that cannot be opened without errors.
+                if local_library_readable and sym_name in existing_symbols:
+                    self.log(
+                        'info',
+                        f"  → Skipping {lib_name}:{sym_name} (already local)"
+                    )
+                    skipped_count += 1
+                else:
+                    dangling_symbols.append(f"{lib_name}:{sym_name}")
             else:
                 symbols_to_copy.add((lib_name, sym_name))
         
+        if dangling_symbols:
+            relative_lib_path = f"{symbol_dir_name}/{symbol_lib_name}{EXTENSION_SYMBOL}"
+            self.log(
+                'warning',
+                f"{len(dangling_symbols)} symbol reference(s) point at the local library "
+                f"'{symbol_lib_name}' but no matching symbol exists in {relative_lib_path}. "
+                "Bakery cannot localize these because there is no source library to copy "
+                "from; the references are left unchanged and the project will still report "
+                "missing symbols when opened."
+            )
+            for reference in sorted(dangling_symbols):
+                self.log('warning', f"  ⚠ Unresolved local symbol reference: {reference}")
+
         if skipped_count > 0:
             self.log('info', f"Skipped {skipped_count} symbols already in {symbol_lib_name}")
         

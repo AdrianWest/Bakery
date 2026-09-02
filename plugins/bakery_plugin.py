@@ -247,7 +247,11 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         except Exception as error:
             self.logger.error(f"Failed to save final PCB state: {error}")
             raise
-        fp_localizer.update_pcb_model_paths(project_path)
+        fp_localizer.update_pcb_model_paths(
+            project_path,
+            project_dir,
+            self.config[CONFIG_MODELS_DIR_NAME]
+        )
 
         self._complete_localization(
             copied_footprints,

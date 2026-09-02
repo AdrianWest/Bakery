@@ -56,9 +56,9 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 
 1. Download or clone this repository
 2. Copy the `plugins` folder contents to your KiCad plugins directory:
-   - **Windows**: `%USERPROFILE%\Documents\KiCad\9.0\scripting\plugins\Bakery\`
-   - **Linux**: `~/.kicad/9.0/scripting/plugins/Bakery/`
-   - **macOS**: `~/Library/Preferences/kicad/9.0/scripting/plugins/Bakery/`
+   - **Windows**: `%USERPROFILE%\Documents\KiCad\10.0\scripting\plugins\Bakery\`
+   - **Linux**: `~/.kicad/10.0/scripting/plugins/Bakery/`
+   - **macOS**: `~/Library/Preferences/kicad/10.0/scripting/plugins/Bakery/`
 3. Restart KiCad
 
 ## Usage
@@ -224,6 +224,8 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 ### v2.0.0 - KiCad 10 Support
 - [x] KiCad 10 project compatibility
 - [x] Support for KiCad 10 projects still referencing 9.x global libraries
+- [x] Idempotent 3D model localization: repeated Bakery runs preserve local `${KIPRJMOD}` model paths
+- [x] Detection and warning of dangling local symbol references instead of reporting a false successful localization
 
 ### Planned for Future Versions
 - [ ] KiCad 11 support and compatibility review
@@ -233,88 +235,65 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 
 ### Unit Tests
 
-Run the comprehensive unit test suite (215 tests covering all modules):
+The unit suite uses Python's built-in `unittest` framework and mocks the
+KiCad APIs where necessary. From the repository root:
 
-```bash
-cd "Unit Test"
-python run_tests.py              # Run all tests
-python run_tests.py -v           # Verbose output
-python run_tests.py --coverage   # With coverage report (requires: pip install coverage)
-python run_tests.py --list       # List all available tests
+```powershell
+python "Unit Test\run_tests.py"             # Run all unit tests
+python "Unit Test\run_tests.py" --verbose   # Show each test name
+python "Unit Test\run_tests.py" --list      # List discovered test modules
+python "Unit Test\run_tests.py" --coverage  # Write terminal and HTML coverage reports
 ```
 
-**Test Coverage:**
-- ✅ 215 tests across 11 test modules
-- ✅ All modules covered: constants, utils, sexpr_parser, library_manager, base_localizer, footprint_localizer, symbol_localizer, data_sheet_localizer, ui_components, bakery_plugin
-- ✅ 0 failures, 0 errors, 0 skipped
+`--coverage` requires the optional `coverage` package:
 
-See [Unit Test/README.md](Unit%20Test/README.md) for detailed testing documentation.
+```powershell
+python -m pip install coverage
+```
 
-### Manual Testing in KiCad
+The suite covers the plugin entry point, localization modules, backup and
+configuration handling, utilities, library management, and S-expression
+parsing. See [Unit Test/README.md](Unit%20Test/README.md) for test-specific
+details.
 
-**Test Projects:**
+### Automated Functional Tests
 
-Two functional test projects are provided in `Functional Test/`:
-- **Ki-Test 01** - Should report 2 expected errors (missing 3D model file, one data sheet can't be down loaded)
-- **Ki-Test 02** - Should complete with no errors
+The functional suite drives a real **KiCad 10** installation through its UI.
+It restores all four fixture projects, installs the plugin, runs Bakery,
+checks the localized project files, verifies a second run is idempotent, and
+reopens the result in KiCad.
 
-**Testing Procedure:**
+**Requirements**
 
-1. Copy test projects from `C:\GIT_HUB\Bakery\Functional Test` to your KiCad projects folder
-2. Make changes to the Bakery Python files (if developing)
-3. Restart KiCad completely
-4. Open a test project (e.g., Ki-Test 01)
-5. Run the plugin from **Tools** > **External Plugins** > **Bakery - Localize Symbols, Footprints, and 3d Models**
-6. Check the log window for detailed output
+- Windows with KiCad 10 installed
+- Python 3.x
+- `pywinauto`, `pywin32`, and `psutil`
+- No open `pcbnew.exe` or Bakery plugin process
 
-**Expected Results:**
-- **Ki-Test 01**: Should report 2 errors:
-  ```
-  ✗ Model file not found: C:\Program Files\KiCad\9.0\share\kicad\3dmodels\Button_Switch_THT.3dshapes\KSA_Tactile_SPST.step
-  • 1 models could not be copied
+Install the Python test dependencies once:
 
-  Could not probe URL headers for https://www.digikey.com/en/models/823904?tab=ultralibrarian: HTTP Error 403: Forbidden - will attempt download
-  ```
-- **Ki-Test 02**: Should complete with 1 error
-  '''
-  HTTP error 403 downloading https://www.coilcraft.com/en-us/files/datasheet/xal7070: HTTP Error 403: Forbidden
-  '''
+```powershell
+python -m pip install pywinauto pywin32 psutil
+```
 
-**Verification Checklist:**
+From the repository root, run the complete suite or selected fixtures:
 
-After running the plugin, verify the following:
+```powershell
+# Run FT-01 through FT-04
+python "Functional Test\functional_suite\run_functional_tests.py"
 
-**In the Schematic (`.kicad_sch`):**
-- [ ] All symbol `lib_id` fields now reference collision-safe local names with stable hash suffixes (e.g., `"MySymbols:Device__R_<hash>"` instead of `"Device:R"`)
-- [ ] Symbol properties are preserved (reference designators, values, etc.)
-- [ ] Schematic visual appearance is unchanged
-- [ ] No missing symbols or broken references
+# Run only selected fixtures while iterating
+python "Functional Test\functional_suite\run_functional_tests.py" --fixtures FT-01,FT-03
 
-**In the PCB (`.kicad_pcb`):**
-- [ ] All footprint references use collision-safe local names with stable hash suffixes (e.g., `"MyLib:Resistor_SMD__R_0805_<hash>"`)
-- [ ] 3D model paths updated to `${KIPRJMOD}/3D Models/` for copied models
-- [ ] Footprint positions, rotations, and layers unchanged
-- [ ] Copper traces, zones, and routing intact
-- [ ] PCB visual appearance identical to before
+# Run one localization pass only, without the idempotence or reopen checks
+python "Functional Test\functional_suite\run_functional_tests.py" --skip-idempotence --skip-reopen
+```
 
-**In the Project Files:**
-- [ ] `fp-lib-table` contains entry for local footprint library
-- [ ] `sym-lib-table` contains entry for local symbol library
-- [ ] Local libraries created: `MyLib.pretty/`, `Symbols/MySymbols.kicad_sym`, `3D Models/`, `Data_Sheets/`
-- [ ] `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip` created before localization
-- [ ] All footprints copied to `MyLib.pretty/`
-- [ ] All symbols present in `Symbols/MySymbols.kicad_sym`
-- [ ] 3D models copied to `3D Models/` folder
-- [ ] PDF datasheets downloaded or copied to `Data_Sheets/` folder
-- [ ] Datasheet references in `.kicad_sym` updated to `${KIPRJMOD}/Data_Sheets/...`
-- [ ] Datasheet references in `.kicad_sch` updated to `${KIPRJMOD}/Data_Sheets/...`
+Test workspace files are created under `C:\GIT_HUB\testing`. Each run writes
+`junit.xml`, `summary.json`, `environment.json`, and `report.md` to
+`C:\GIT_HUB\testing\results\<timestamp>\`. Datasheet download failures and
+the fixtures' deliberately missing references are asserted as expected
+conditions; unexpected localization failures cause a nonzero exit code.
 
-**Functional Tests:**
-- [ ] Open schematic - no missing symbol warnings
-- [ ] Open PCB - no missing footprint warnings
-- [ ] 3D viewer shows models correctly (except intentionally missing ones)
-- [ ] New Symbol libaries should open in the editor without error
-- [ ] New Footprint libaries should open in the editor without error
-- [ ] DRC (Design Rule Check) runs without new errors
-- [ ] ERC (Electrical Rule Check) runs without new errors
-- [ ] Project can be opened on a different computer without KiCad global libraries
+See [Functional Test/functional_suite/README.md](Functional%20Test/functional_suite/README.md)
+for the fixture matrix, assertions, expected issues, and report details.

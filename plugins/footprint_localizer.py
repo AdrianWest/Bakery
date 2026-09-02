@@ -36,6 +36,7 @@ libraries, and localizes associated 3D models (STEP, WRL, etc.).
 """
 
 import os
+import re
 import shutil
 from typing import List, Tuple, Optional, Callable, Set
 
@@ -55,6 +56,14 @@ from .utils import (
     make_localized_item_name, safe_read_file, scan_schematics_for_items,
     validate_path_safety, KicadPathResolutionError
 )
+
+# Matches a `(model "...")` token's path text in raw .kicad_pcb/.kicad_mod
+# S-expression content. Used to find embedded 3D model references directly
+# in file text, independent of any in-memory board/footprint API, because a
+# board's own embedded per-footprint 3D model reference cannot reliably be
+# repaired through the pcbnew Python API alone (see
+# `update_pcb_model_paths`).
+_MODEL_PATH_TOKEN_RE = re.compile(r'\(model\s+"([^"]+)"')
 
 
 class FootprintLocalizer(BaseLocalizer):
@@ -620,7 +629,14 @@ class FootprintLocalizer(BaseLocalizer):
                     )
                     
                 # Always update embedded model references in the in-memory board.
-                for model in fp.Models():
+                # NOTE: fp.Models() returns a SWIG-wrapped std::vector<FP_3DMODEL>&;
+                # indexed access (models[idx]) yields a *copy* of each element, so
+                # mutating that copy's m_Filename is a silent no-op. The mutated
+                # copy must be written back with models[idx] = model for the
+                # change to actually persist on the underlying footprint.
+                models = fp.Models()
+                for idx in range(len(models)):
+                    model = models[idx]
                     old_model_path = str(model.m_Filename)
                     new_model_path = model_map.get(old_model_path)
                     if not new_model_path and old_model_path.startswith('${KICAD9_'):
@@ -634,6 +650,7 @@ class FootprintLocalizer(BaseLocalizer):
                             new_model_path = next(iter(matching_paths))
                     if new_model_path:
                         model.m_Filename = new_model_path
+                        models[idx] = model
                         model_updates += 1
                         self.log('info', f"  ✓ Updated 3D model for {fp_name}: {old_model_path} → {new_model_path}")
                     
@@ -657,40 +674,124 @@ class FootprintLocalizer(BaseLocalizer):
         
         return updated_count + model_updates
 
-    def update_pcb_model_paths(self, pcb_file_path: str) -> int:
+    def resolve_unlocalized_pcb_models(
+        self,
+        pcb_content: str,
+        project_dir: str,
+        models_dir_name: str,
+        known_map: dict
+    ) -> dict:
+        """
+        @brief Find and localize 3D model paths embedded in PCB file text
+            that are not yet covered by a known old-to-new path mapping
+
+        The pcbnew Python API does not reliably allow this plugin to update
+        a board's embedded per-footprint 3D model reference in memory (only
+        rewriting the on-disk file text is dependable; see
+        `update_pcb_model_paths`). Because of this, `self.copied_models`
+        built from the current run's freshly-copied footprints is not
+        always enough: on a second Bakery run, footprints are already local
+        so no old-path mapping is produced by `localize_3d_models`, yet the
+        saved board can still embed a stale, non-local model path carried
+        over from before. This method makes the PCB-level repair
+        self-sufficient by scanning the file text for every embedded model
+        path, resolving and copying any that are not yet project-local, so
+        the caller can repoint them regardless of whether footprints were
+        copied this run.
+
+        @param pcb_content: Full text of the .kicad_pcb file already read
+        @param project_dir: Project directory used to expand ${KIPRJMOD} etc.
+        @param models_dir_name: Name of the local 3D models directory
+        @param known_map: Old-to-new path mapping already known this run;
+            paths already present as keys are skipped
+        @return Dictionary of newly discovered old-path to new-path mappings
+        """
+        models_dir = os.path.join(project_dir, models_dir_name)
+        if not validate_path_safety(models_dir, project_dir):
+            return {}
+
+        discovered: dict = {}
+        for model_path in _MODEL_PATH_TOKEN_RE.findall(pcb_content):
+            if model_path in known_map or model_path in discovered:
+                continue
+            if model_path.startswith(f'${{{ENV_VAR_KIPRJMOD}}}/'):
+                continue
+
+            try:
+                expanded_path = self.lib_manager.expand_path(model_path, project_dir)
+            except KicadPathResolutionError:
+                continue
+
+            os.makedirs(models_dir, exist_ok=True)
+            self.copy_single_model(model_path, expanded_path, models_dir, models_dir_name, discovered)
+
+        return discovered
+
+    def update_pcb_model_paths(
+        self,
+        pcb_file_path: str,
+        project_dir: Optional[str] = None,
+        models_dir_name: Optional[str] = None
+    ) -> int:
         """
         @brief Rewrite embedded 3D model paths in a saved .kicad_pcb file
 
         The board file embeds a copy of each footprint, including its own
         (model "...") reference. After the model files have been localized,
         this replaces the old global model paths with the new ${KIPRJMOD}
-        paths in the board file itself.
+        paths in the board file itself. When `project_dir` and
+        `models_dir_name` are supplied, this also sweeps the file for any
+        embedded model path not already covered by this run's
+        `copied_models` map, resolving and copying it if needed, so the fix
+        does not depend on footprints having been freshly copied this run
+        (see `resolve_unlocalized_pcb_models`); this is what keeps repeated
+        runs idempotent for 3D model paths.
 
         @param pcb_file_path: Absolute path to the .kicad_pcb file
+        @param project_dir: Project directory (enables the supplemental
+            sweep for stale embedded model paths on repeat runs)
+        @param models_dir_name: Name of the local 3D models directory
+            (required together with project_dir for the supplemental sweep)
         @return Number of model path replacements made
         """
-        model_map = getattr(self, 'copied_models', None)
-        if not model_map:
-            return 0
-        
+        model_map = dict(getattr(self, 'copied_models', None) or {})
+
         try:
             content = safe_read_file(pcb_file_path)
-            
+
+            if project_dir and models_dir_name:
+                extra_map = self.resolve_unlocalized_pcb_models(
+                    content, project_dir, models_dir_name, model_map
+                )
+                if extra_map:
+                    model_map.update(extra_map)
+                    self.copied_models = dict(getattr(self, 'copied_models', None) or {})
+                    self.copied_models.update(extra_map)
+
+            if not model_map:
+                return 0
+
             updated_count = 0
             for old_path, new_path in model_map.items():
+                # Already-local footprints yield identity mappings; replacing
+                # a path with itself changes nothing, so skip them to avoid
+                # both a pointless file rewrite and misleading "repointed"
+                # log lines on repeat runs.
+                if old_path == new_path:
+                    continue
                 old_token = f'"{old_path}"'
                 if old_token in content:
                     count = content.count(old_token)
                     content = content.replace(old_token, f'"{new_path}"')
                     updated_count += count
                     self.log('info', f"  PCB: repointed {count} model reference(s) {old_path} → {new_path}")
-            
+
             if updated_count > 0:
                 atomic_write_file(pcb_file_path, content)
                 self.log('info', f"Updated {updated_count} 3D model reference(s) in {os.path.basename(pcb_file_path)}")
-            
+
             return updated_count
-            
+
         except (OSError, ValueError) as e:
             self.log('error', f"Failed to update 3D model paths in {os.path.basename(pcb_file_path)}: {e}")
             raise

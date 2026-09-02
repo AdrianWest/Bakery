@@ -211,7 +211,7 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 - [x] Collision-safe local names and filenames for symbols, footprints, 3D models, and datasheets
 - [x] Mandatory KiCad-compatible, timestamped ZIP backup before localization
 - [x] Restore previous designs through KiCad's **File** > **Unarchive Project...** command
-- [x] Idempotent repeat runs that preserve local `${KIPRJMOD}` 3D model paths
+- [x] Safe repeat runs that preserve local `${KIPRJMOD}` 3D model paths
 - [x] Detection and user-visible warnings for unresolved local symbol references
 - [x] Recursive hierarchical-schematic processing and dual PCB/schematic scanning
 - [x] Automated unit tests and Windows KiCad 10 functional tests
@@ -251,7 +251,8 @@ details.
 
 The functional suite drives a real **KiCad 10** installation through its UI.
 It restores all four fixture projects, installs the plugin, runs Bakery,
-checks the localized project files, verifies a second run is idempotent, and
+checks the localized project files, verifies a second run makes no unintended
+changes, and
 reopens the result in KiCad.
 
 **Requirements**
@@ -276,7 +277,7 @@ python "Functional Test\functional_suite\run_functional_tests.py"
 # Run only selected fixtures while iterating
 python "Functional Test\functional_suite\run_functional_tests.py" --fixtures FT-01,FT-03
 
-# Run one localization pass only, without the idempotence or reopen checks
+# Run one localization pass only, without the second-run or reopen checks
 python "Functional Test\functional_suite\run_functional_tests.py" --skip-idempotence --skip-reopen
 ```
 

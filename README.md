@@ -6,18 +6,19 @@
 
 ---
 
-## ⚠️ **IMPORTANT: Use Version Control!** ⚠️
+## ⚠️ **IMPORTANT: Protect Your Design** ⚠️
 
 ### **This plugin makes extensive changes to your schematic and PCB files.**
 
-### **Put your KiCad project on a Git repository BEFORE running this plugin!**
+### **Bakery creates a KiCad-compatible ZIP backup before it changes your project.**
 
 **Why?**
 - Bakery modifies `.kicad_sch` and `.kicad_pcb` files extensively
-- The easiest way to recover from an unwanted conversion is to revert from Git
-- Bakery creates a KiCad-style ZIP backup before localization, but Git remains recommended for complete history
+- Bakery now supports restoring a previous design with KiCad's built-in **Unarchive Project** command
+- Each backup is saved as `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip`
+- Version control is still recommended for complete history and day-to-day change tracking
 
-**Quick Git setup (if you don't have one):**
+**Recommended: put your project under Git before running Bakery:**
 ```bash
 cd /path/to/your/project
 git init
@@ -85,17 +86,21 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
    - Update references in both PCB and schematic files to point to local libraries
    - Abort before making changes if the project backup cannot be created
 
-## Restoring a Bakery Backup with KiCad
+## Restore a Previous Design
 
-Bakery backups are standard ZIP project archives and can be restored with
-KiCad's built-in **Unarchive Project** command:
+Bakery backups are standard KiCad ZIP project archives. Restore a previous
+design at any time with KiCad's built-in **Unarchive Project** command:
 
-1. Close the project you want to restore.
+1. Close the current project.
 2. In the KiCad Project Manager, select **File** > **Unarchive Project...**.
 3. Select the desired ZIP from the project's `<project>-backups` folder.
-4. Choose the folder where KiCad should restore the archived project.
-5. Open the restored `.kicad_pro` file and verify the project before replacing
-   or deleting the current copy.
+4. Select a new, empty folder for the restored project. Do not restore over
+   the current design until you have confirmed the backup is correct.
+5. Open the restored `.kicad_pro` file and verify the schematic and PCB.
+6. If it is correct, replace the current project only if needed.
+
+For details, see the official KiCad documentation:
+[Project archive and unarchive](https://docs.kicad.org/10.0/en/kicad/kicad.html#project-archive).
 
 ![KiCad File menu highlighting Unarchive Project](resources/KiCad-Restor.png)
 
@@ -199,37 +204,23 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 
 ## Roadmap
 
-### Version 1.0.2 - Released
-- [x] Symbol localization from global to project libraries
-- [x] Footprint localization from global to project libraries
-- [x] 3D model localization with path updates
-- [x] Dual scanning (PCB and schematic files)
-- [x] Progress dialog with detailed logging (info/warning/error panes)
-- [x] Configuration dialog for all options
-- [x] PCB and schematic file updates
-- [x] Symbol and footprint library table management
-- [x] Automatic timestamped backup creation
-- [x] KiCad 9 environment variable compatibility
-- [x] Comprehensive Doxygen documentation
-- [x] Support for hierarchical schematics
-- [x] Full unit test suite
+### Version 2.1.0 - Current Release
 
-### Version 1.1.0 - Released
-- [x] Datasheet localization - download PDFs from internet URLs, copy local PDF files
-- [x] Datasheet reference updates in symbol libraries and schematics using `${KIPRJMOD}` paths
-- [x] Configurable datasheets directory name (default: "Data_Sheets")
-- [x] Bug fixes in S-expression parser property name handling
-- [x] Bug fixes in file read error handling for missing files
-
-### v2.0.0 - KiCad 10 Support
-- [x] KiCad 10 project compatibility
-- [x] Support for KiCad 10 projects still referencing 9.x global libraries
-- [x] Idempotent 3D model localization: repeated Bakery runs preserve local `${KIPRJMOD}` model paths
-- [x] Detection and warning of dangling local symbol references instead of reporting a false successful localization
+- [x] KiCad 10 project support, including projects that still reference 9.x global libraries
+- [x] Localization of symbols, footprints, 3D models, and datasheets into project-local libraries
+- [x] Collision-safe local names and filenames for symbols, footprints, 3D models, and datasheets
+- [x] Mandatory KiCad-compatible, timestamped ZIP backup before localization
+- [x] Restore previous designs through KiCad's **File** > **Unarchive Project...** command
+- [x] Idempotent repeat runs that preserve local `${KIPRJMOD}` 3D model paths
+- [x] Detection and user-visible warnings for unresolved local symbol references
+- [x] Recursive hierarchical-schematic processing and dual PCB/schematic scanning
+- [x] Automated unit tests and Windows KiCad 10 functional tests
 
 ### Planned for Future Versions
-- [ ] KiCad 11 support and compatibility review
-- [ ] Additional features based on user feedback
+
+- [ ] KiCad 11 compatibility review and support
+- [ ] Additional localization and recovery improvements based on user feedback
+- [ ] Expanded functional-test coverage for new KiCad versions and project configurations
 
 ## Testing
 

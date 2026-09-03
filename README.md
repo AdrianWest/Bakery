@@ -1,5 +1,18 @@
 ![Bakery KiCad Plugin banner](resources/Banner-No-robot.png)
 
+<table>
+  <tr>
+    <td>
+      <a href="https://www.buymeacoffee.com/Adrian_West" target="_blank">
+        <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="217" height="60">
+      </a>
+    </td>
+    <td>
+      <img src="resources/qr-code.png" alt="Buy Me A Coffee QR code" width="90">
+    </td>
+  </tr>
+</table>
+
 # Bakery - KiCad Plugin
 
 **Localize all KiCad symbols, footprints, 3D models, and datasheets to project libraries - They get Baked into your project**
@@ -62,18 +75,30 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
    - **macOS**: `~/Library/Preferences/kicad/10.0/scripting/plugins/Bakery/`
 3. Restart KiCad
 
-## Usage
+## How To Use Bakery
 
-1. Open your KiCad project and PCB file in pcbnew
-2. Click the ![Bakery](plugins/resources/Bakery_Icon_32x32.png) icon button in the top toolbar (or go to **Tools** > **External Plugins** > **Bakery - Localize Symbols, Footprints, and 3d Models**)
-3. Configure options in the dialog:
+### 1. Prepare Your Project
+
+1. Save your KiCad project, schematic, and PCB.
+2. Close any other KiCad windows that have the project open.
+3. Confirm that the project is under version control if possible. Bakery also
+   creates a timestamped KiCad ZIP backup before making changes.
+
+### 2. Run Bakery
+
+1. Open the project's PCB in **PCB Editor**.
+2. Click the ![Bakery](plugins/resources/Bakery_Icon_32x32.png) icon in the
+   top toolbar, or select **Tools** > **External Plugins** >
+   **Bakery - Localize Symbols, Footprints, and 3d Models**.
+3. Choose the local library and folder names:
    - Local library name for footprints (default: "MyLib")
    - Symbol library name (default: "MySymbols")
    - Symbol directory name (default: "Symbols")
    - 3D models folder name (default: "3D Models")
    - Datasheets directory name (default: "Data_Sheets")
-4. Confirm the operation
-5. The plugin will:
+4. Confirm the operation and leave KiCad open while Bakery completes.
+
+Bakery will:
    - Create `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip`
    - Create local `.pretty` folders for footprints
    - Create local symbol library (`.kicad_sym`) in Symbols directory
@@ -85,6 +110,15 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
    - Update `fp-lib-table` and `sym-lib-table` to include local libraries
    - Update references in both PCB and schematic files to point to local libraries
    - Abort before making changes if the project backup cannot be created
+
+### 3. Check the Result
+
+1. Review Bakery's log, warnings, and errors before closing KiCad.
+2. Open the schematic and PCB to confirm that symbols and footprints load
+   correctly.
+3. Open the 3D Viewer to confirm copied 3D models render as expected.
+4. The project is now portable: its localized libraries, models, and
+   datasheets are stored in the project folder.
 
 ## Restore a Previous Design
 

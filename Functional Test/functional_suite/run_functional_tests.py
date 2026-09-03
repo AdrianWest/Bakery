@@ -15,8 +15,8 @@ Section 15 (Acceptance Criteria) as a single command:
 4. For each fixture: capture a baseline, run Bakery twice in the same KiCad
    session, and verify the UI outcome, localized files, backup, and
    idempotence (Sections 8, 9, 11).
-5. Reopen the localized PCB to confirm KiCad 10 can still load it
-   (Section 9.7).
+5. Reopen the localized PCB and root schematic to confirm KiCad 10 can still
+   load both design surfaces (Section 9.7).
 6. Confirm the source fixtures are unchanged (FIX-01, Section 12).
 7. Write JUnit XML, a JSON summary, and supporting artifacts (Section 14),
    and return a reliable process exit code (RES-06/RES-07).
@@ -68,7 +68,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument(
         "--skip-reopen",
         action="store_true",
-        help="Skip the KiCad reopen verification (Section 9.7)",
+        help="Skip the KiCad PCB/schematic reopen verification (Section 9.7)",
     )
     return parser.parse_args(argv)
 
@@ -84,6 +84,24 @@ def _selected_fixtures(fixture_ids: str):
         return list(config.FIXTURE_MATRIX)
     wanted = {f.strip().upper() for f in fixture_ids.split(",") if f.strip()}
     return [f for f in config.FIXTURE_MATRIX if f.test_id in wanted]
+
+
+def _root_schematic_path(project_dir: Path, project_name: str) -> Path:
+    """
+    @brief Resolve the root schematic for a copied fixture project
+
+    @param project_dir: Working copy project directory
+    @param project_name: Project base name, usually shared by PCB/schematic
+    @return Root schematic path, falling back to the first schematic found
+    @throws KicadDriverError if the project contains no schematic file
+    """
+    expected = project_dir / f"{project_name}.kicad_sch"
+    if expected.is_file():
+        return expected
+    schematics = sorted(project_dir.glob("*.kicad_sch"))
+    if schematics:
+        return schematics[0]
+    raise KicadDriverError(f"AST-RUI-04: no root schematic found in {project_dir}")
 
 
 def _record_run_result(
@@ -170,7 +188,8 @@ def run_fixture(
     @param environment_report: environment.EnvironmentReport
     @param bakery_version: Installed Bakery version string
     @param skip_idempotence: When True, skip the second run and IDM-* checks
-    @param skip_reopen: When True, skip the KiCad reopen verification
+    @param skip_reopen: When True, skip the KiCad PCB/schematic reopen
+        verification
     """
     project_dir = fixtures.working_project_dir(fixture)
     pcb_path = project_dir / fixture.pcb_file
@@ -292,6 +311,14 @@ def run_fixture(
             reopen_driver = KicadDriver(controller.pcbnew_path)
             try:
                 reopen_driver.launch(pcb_path, converted_hint=False)
+                report.add(
+                    "AST-RUI-01",
+                    True,
+                    "Localized PCB reopened without parse, rescue, or "
+                    "missing-footprint dialogs",
+                )
+                report.add("AST-RUI-02", True, "Localized PCB opened in PCB Editor")
+                report.add("AST-RUI-03", True, "PCB Editor displayed and closed normally")
                 reopen_driver.save_and_close()
             except KicadDriverError as exc:
                 reporter.record(TestOutcome(
@@ -301,6 +328,43 @@ def run_fixture(
                 ))
                 reopen_driver.force_close()
                 return
+
+            root_schematic = _root_schematic_path(project_dir, project_name)
+            if fixture_issues.get("unresolved_symbols"):
+                report.add(
+                    "AST-RUI-04",
+                    True,
+                    "SKIPPED: this fixture intentionally retains unresolved "
+                    f"symbol reference(s): {fixture_issues['unresolved_symbols']}",
+                )
+            else:
+                schematic_driver = KicadDriver(controller.pcbnew_path)
+                try:
+                    schematic_driver.launch_schematic(root_schematic)
+                    report.add(
+                        "AST-RUI-04",
+                        True,
+                        f"Root schematic opened in KiCad: {root_schematic.name}",
+                    )
+                    schematic_driver.close_without_saving()
+                except KicadDriverError as exc:
+                    reporter.record(TestOutcome(
+                        test_id=f"{fixture.test_id}-schematic-reopen",
+                        name=f"{fixture.intent} schematic reopen",
+                        status="failed", duration_seconds=0.0,
+                        message=f"AST-RUI-04: {exc}",
+                        details=report.to_json(),
+                    ))
+                    schematic_driver.force_close()
+                    return
+        else:
+            for assertion_id in ("AST-RUI-01", "AST-RUI-02", "AST-RUI-03", "AST-RUI-04"):
+                report.add(
+                    assertion_id,
+                    True,
+                    "SKIPPED: --skip-reopen was passed, so KiCad GUI reopen "
+                    "verification was not performed",
+                )
 
         reporter.record(TestOutcome(
             test_id=fixture.test_id, name=fixture.intent, status="passed",

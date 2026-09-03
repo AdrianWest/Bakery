@@ -15,7 +15,8 @@ The suite must automate the same high-level workflow as a manual release test:
 4. Run Bakery from **Tools > External Plugins**.
 5. Accept the default Bakery configuration and confirm localization.
 6. Verify the Bakery result in the UI and on disk.
-7. Reopen the project and verify KiCad can load the localized result.
+7. Reopen the project and verify KiCad can load the localized PCB and root
+   schematic.
 8. Produce machine-readable results and failure evidence.
 
 ## 2. Compatibility Scope
@@ -64,7 +65,7 @@ projects.
 The runner must check these prerequisites before changing any files:
 
 - **ENV-01** — Windows 10 or Windows 11 interactive desktop session.
-- **ENV-02** — KiCad 10 PCB Editor installed.
+- **ENV-02** — KiCad 10 PCB Editor and Schematic Editor installed.
 - **ENV-03** — The KiCad 10 global symbol, footprint, and 3D model libraries
   required by the fixtures are installed and configured.
 - **ENV-04** — Python 3 available to the test runner.
@@ -102,6 +103,8 @@ The suite should contain four logical components:
      **Bakery - Localize Symbols, Footprints, and 3D Models**.
    - Drives the Bakery configuration, confirmation, log, and success dialogs.
    - Saves and closes the PCB Editor.
+   - Reopens the localized root schematic in KiCad Schematic Editor and fails
+     on missing-symbol-library, rescue, or schematic parse dialogs.
 
 3. **COMP-03 — Project verifier**
    - Captures a pre-run manifest.
@@ -299,19 +302,23 @@ local files are functional failures even if Bakery reports them as warnings
 
 ### 9.7 KiCad reopen verification
 
-After filesystem checks, reopen the localized PCB in KiCad 10 and verify:
+After filesystem checks, reopen the localized PCB and root schematic in KiCad
+10 and verify:
 
 - **AST-RUI-01** — The PCB loads without a parse, rescue, or
   missing-footprint error dialog.
 - **AST-RUI-02** — The board contains at least one footprint.
 - **AST-RUI-03** — KiCad can display the board and close normally.
-- **AST-RUI-04** — Opening the root schematic, when automated schematic
-  verification is enabled, does not show missing symbol library or rescue
+- **AST-RUI-04** — Opening the root schematic in KiCad Schematic Editor does
+  not show schematic parse, missing symbol library, missing symbol, or rescue
   dialogs.
 
-The first implementation may make schematic GUI reopening optional if reliable
-Eeschema UI automation is not yet available. Static schematic and symbol
-library checks remain mandatory.
+AST-RUI-04 is mandatory for fixtures whose symbol references are expected to be
+fully resolvable after Bakery completes. If a fixture intentionally contains a
+known unresolved symbol reference listed in the suite allowlist, the runner may
+record AST-RUI-04 as skipped for that fixture only; the static symbol
+assertions and known-issue trap assertions remain mandatory so the skipped GUI
+open cannot hide an unexpected localization failure.
 
 ## 10. Legacy Fixture Assertions
 
@@ -408,7 +415,7 @@ The functional suite is complete when one command can:
 3. **ACC-03** — Install the current Bakery source into KiCad 10.
 4. **ACC-04** — Run Bakery twice on each of the four projects.
 5. **ACC-05** — Verify the UI outcome, localized files and references,
-   project backup, KiCad reopen behavior, and idempotence.
+   project backup, PCB and schematic KiCad reopen behavior, and idempotence.
 6. **ACC-06** — Leave the source fixtures unchanged.
 7. **ACC-07** — Return a reliable exit code and produce sufficient artifacts
    to diagnose a failure without rerunning the suite interactively.
@@ -503,6 +510,6 @@ abort, empty-project abort).
 3. Implement one FT-01 happy-path UI test.
 4. Add static project verification.
 5. Add FT-02 through FT-04.
-6. Add KiCad reopen verification.
+6. Add KiCad PCB and schematic reopen verification.
 7. Add second-run idempotence checks.
 8. Add screenshots, JUnit XML, JSON reporting, and failure cleanup.

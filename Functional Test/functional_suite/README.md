@@ -27,7 +27,7 @@ python -m functional_suite.run_functional_tests
 # Run a subset while iterating:
 python -m functional_suite.run_functional_tests --fixtures FT-01,FT-03
 
-# Skip the second-run idempotence pass and/or the KiCad reopen check:
+# Skip the second-run idempotence pass and/or the KiCad PCB/schematic reopen check:
 python -m functional_suite.run_functional_tests --skip-idempotence --skip-reopen
 ```
 
@@ -50,8 +50,8 @@ The suite always:
    drives the Bakery UI (config dialog → confirmation → completion →
    success), and verifies the result against the `AST-*` assertions.
 6. Re-runs Bakery in the same session and checks idempotence (`IDM-01..07`),
-   then reopens the localized PCB in a fresh KiCad process to confirm it
-   still loads (`AST-RUI-01`, Section 9.7).
+   then reopens the localized PCB and root schematic in fresh KiCad
+   processes to confirm both still load (`AST-RUI-01..04`, Section 9.7).
 7. Confirms the source fixtures were not mutated (`FIX-01`).
 8. Writes `junit.xml`, `summary.json`, `environment.json`,
    `report.md`, and `installed-plugin-manifest.json` under

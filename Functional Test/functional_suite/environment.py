@@ -213,6 +213,8 @@ class EnvironmentController:
         self.pcbnew_path = find_pcbnew_executable()
         if self.pcbnew_path is None:
             raise PreflightError("ENV-02: KiCad 10 PCB Editor was not found")
+        if not self.pcbnew_path.with_name("eeschema.exe").is_file():
+            raise PreflightError("ENV-02: KiCad 10 Schematic Editor was not found")
 
         if sys.version_info < (3, 8):
             raise PreflightError("ENV-04: Python 3.8+ is required")

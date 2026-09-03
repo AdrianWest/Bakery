@@ -474,8 +474,8 @@ def render_markdown(summary: Dict, environment: Optional[Dict] = None) -> str:
         "is opened in `pcbnew.exe`, the Bakery plugin is invoked through its "
         "dialogs, and the resulting files are verified on disk. Each fixture "
         "is then processed a **second** time to prove the operation is "
-        "idempotent, and the localized board is reopened in a fresh KiCad "
-        "process to confirm it still loads.</sub>",
+        "idempotent, and the localized board and root schematic are reopened "
+        "in fresh KiCad processes to confirm they still load.</sub>",
         "",
     ]
     return "\n".join(lines)

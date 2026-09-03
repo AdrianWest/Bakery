@@ -59,6 +59,13 @@ MENU_PATH = (
     "Tools -> External Plugins -> "
     "Bakery - Localize Symbols, Footprints, and 3D Models"
 )
+SCHEMATIC_WINDOW_TITLE_RE = r".*Schematic Editor.*"
+SCHEMATIC_BLOCKING_DIALOG_PATTERNS = (
+    r".*[Ee]rror.*",
+    r".*[Rr]escue.*",
+    r".*[Mm]issing.*",
+    r".*[Ss]ymbol.*[Ll]ibrar.*",
+)
 
 # Config field order matches CONFIG_FIELD_SPECS in plugins/ui_components.py,
 # which is also the order pywinauto returns the dialog's Edit controls in.
@@ -128,8 +135,10 @@ class KicadDriver:
 
     @section methods Methods
     - :py:meth:`~KicadDriver.launch`
+    - :py:meth:`~KicadDriver.launch_schematic`
     - :py:meth:`~KicadDriver.run_bakery`
     - :py:meth:`~KicadDriver.save_and_close`
+    - :py:meth:`~KicadDriver.close_without_saving`
     - :py:meth:`~KicadDriver.force_close`
     """
 
@@ -169,6 +178,88 @@ class KicadDriver:
         self.main_window = self.app.window(title_re=r".*PCB Editor.*")
         self.main_window.wait("exists visible ready", timeout=60)
         return converted
+
+    def launch_schematic(self, schematic_path: Path) -> None:
+        """
+        @brief Start KiCad Schematic Editor against a copied .kicad_sch file
+            and fail if KiCad reports missing libraries or rescue/errors
+
+        @param schematic_path: Path to the working copy's root .kicad_sch file
+
+        @throws KicadDriverError if Eeschema is unavailable, the schematic
+            window never becomes available, or a blocking load dialog appears
+        """
+        eeschema_path = self.pcbnew_path.with_name("eeschema.exe")
+        if not eeschema_path.is_file():
+            raise KicadDriverError(
+                f"AST-RUI-04: KiCad Schematic Editor not found: {eeschema_path}"
+            )
+
+        self.process = subprocess.Popen(
+            [str(eeschema_path), str(schematic_path)],
+            cwd=str(schematic_path.parent),
+        )
+
+        deadline = time.monotonic() + 60
+        last_dialog = ""
+        while time.monotonic() < deadline:
+            last_dialog = self._blocking_dialog_text(SCHEMATIC_BLOCKING_DIALOG_PATTERNS)
+            if last_dialog:
+                raise KicadDriverError(
+                    "AST-RUI-04: schematic load showed a blocking dialog: "
+                    f"{last_dialog}"
+                )
+
+            try:
+                self.app = Application(backend="win32").connect(
+                    process=self.process.pid, timeout=1
+                )
+                self.main_window = self.app.window(title_re=SCHEMATIC_WINDOW_TITLE_RE)
+                self.main_window.wait("exists visible ready", timeout=1)
+                time.sleep(3)
+                last_dialog = self._blocking_dialog_text(
+                    SCHEMATIC_BLOCKING_DIALOG_PATTERNS
+                )
+                if last_dialog:
+                    raise KicadDriverError(
+                        "AST-RUI-04: schematic load showed a blocking dialog: "
+                        f"{last_dialog}"
+                    )
+                return
+            except (ElementNotFoundError, PywinautoTimeoutError):
+                time.sleep(1)
+
+        raise KicadDriverError(
+            "AST-RUI-04: root schematic did not open in KiCad Schematic "
+            "Editor within 60s"
+        )
+
+    def _blocking_dialog_text(self, title_patterns) -> str:
+        """
+        @brief Return text for the first blocking dialog owned by this process
+
+        @param title_patterns: Iterable of title regex patterns to inspect
+        @return Dialog title and text, or an empty string when none is found
+        """
+        if self.process is None:
+            return ""
+        for pattern in title_patterns:
+            try:
+                app = Application(backend="win32").connect(
+                    process=self.process.pid, title_re=pattern, timeout=1
+                )
+                dialog = app.window(title_re=pattern)
+                text = _read_uia_text(dialog.handle)
+                if not text:
+                    text = "\n".join(
+                        child.window_text()
+                        for child in dialog.children()
+                        if child.window_text()
+                    )
+                return f"{dialog.window_text()}: {text}"
+            except (ElementNotFoundError, PywinautoTimeoutError):
+                continue
+        return ""
 
     def _handle_startup_dialogs(self, converted_hint: bool) -> bool:
         """
@@ -479,6 +570,44 @@ class KicadDriver:
                 self.process.wait(timeout=30)
             except subprocess.TimeoutExpired:
                 pass
+
+    def close_without_saving(self) -> None:
+        """
+        @brief Close an editor window without intentionally writing files
+        """
+        if self.main_window is not None:
+            self.main_window.close()
+        if self.process:
+            try:
+                self.process.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                for button_title in (
+                    "&No",
+                    "No",
+                    "Don't Save",
+                    "Do&n't Save",
+                    "Discard",
+                ):
+                    try:
+                        app = Application(backend="win32").connect(
+                            process=self.process.pid,
+                            title_re=r".*[Ss]ave.*",
+                            timeout=1,
+                        )
+                        app.window(title_re=r".*[Ss]ave.*").child_window(
+                            title=button_title, class_name="Button"
+                        ).click()
+                        break
+                    except (
+                        ElementNotFoundError,
+                        ElementNotEnabled,
+                        PywinautoTimeoutError,
+                    ):
+                        continue
+                try:
+                    self.process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    pass
 
     def force_close(self) -> None:
         """

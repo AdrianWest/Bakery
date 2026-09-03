@@ -264,7 +264,7 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 - [x] Safe repeat runs that preserve local `${KIPRJMOD}` 3D model paths
 - [x] Detection and user-visible warnings for unresolved local symbol references
 - [x] Recursive hierarchical-schematic processing and dual PCB/schematic scanning
-- [x] Automated unit tests and Windows KiCad 10 functional tests
+- [x] Automated unit tests and Windows KiCad 10 functional tests that reopen both the localized PCB and root schematic
 
 ### Planned for Future Versions
 
@@ -302,8 +302,7 @@ details.
 The functional suite drives a real **KiCad 10** installation through its UI.
 It restores all four fixture projects, installs the plugin, runs Bakery,
 checks the localized project files, verifies a second run makes no unintended
-changes, and
-reopens the result in KiCad.
+changes, and reopens the localized PCB and root schematic in KiCad.
 
 **Requirements**
 
@@ -327,7 +326,7 @@ python "Functional Test\functional_suite\run_functional_tests.py"
 # Run only selected fixtures while iterating
 python "Functional Test\functional_suite\run_functional_tests.py" --fixtures FT-01,FT-03
 
-# Run one localization pass only, without the second-run or reopen checks
+# Run one localization pass only, without the second-run or PCB/schematic reopen checks
 python "Functional Test\functional_suite\run_functional_tests.py" --skip-idempotence --skip-reopen
 ```
 
@@ -335,7 +334,8 @@ Test workspace files are created under `C:\GIT_HUB\testing`. Each run writes
 `junit.xml`, `summary.json`, `environment.json`, and `report.md` to
 `C:\GIT_HUB\testing\results\<timestamp>\`. Datasheet download failures and
 the fixtures' deliberately missing references are asserted as expected
-conditions; unexpected localization failures cause a nonzero exit code.
+conditions; unexpected localization, PCB reopen, or schematic reopen failures
+cause a nonzero exit code.
 
 See [Functional Test/functional_suite/README.md](Functional%20Test/functional_suite/README.md)
 for the fixture matrix, assertions, expected issues, and report details.

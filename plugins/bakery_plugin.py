@@ -56,7 +56,7 @@ from .constants import (
     PROGRESS_PCT_UPDATE_SCHEMATICS, PROGRESS_PCT_SCAN_SYMBOLS, PROGRESS_PCT_COPY_SYMBOLS,
     PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, PROGRESS_PCT_UPDATE_SYMBOL_REFS, PROGRESS_COMPLETE
 )
-from .ui_components import BakeryLogger, ConfigDialog
+from .ui_components import BakeryLogger, ConfigDialog, show_completion_dialog
 from .footprint_localizer import FootprintLocalizer
 from .symbol_localizer import SymbolLocalizer
 from .data_sheet_localizer import DataSheetLocalizer
@@ -484,7 +484,6 @@ class BakeryPlugin(pcbnew.ActionPlugin):
 
         self.logger.set_progress(PROGRESS_INITIAL, PROGRESS_BAR_RANGE, "")
         completion_msg = (
-            f"Localization Complete!\n\n"
             f"• {footprint_copy_count} footprints copied\n"
             f"• {symbol_copy_count} symbols copied\n"
         )
@@ -494,8 +493,4 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             "\nAll references have been updated to use local libraries."
         )
         
-        wx.MessageBox(
-            completion_msg,
-            "Bakery - Success",
-            wx.OK | wx.ICON_INFORMATION
-        )
+        show_completion_dialog(None, completion_msg)

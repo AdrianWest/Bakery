@@ -1,17 +1,19 @@
 ![Bakery KiCad Plugin banner](resources/Banner-No-robot.png)
 
-<table>
+<p align="center">
+<table align="center">
   <tr>
-    <td>
+    <td align="center">
       <a href="https://www.buymeacoffee.com/Adrian_West" target="_blank">
         <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="217" height="60">
       </a>
     </td>
-    <td>
+    <td align="center">
       <img src="resources/qr-code.png" alt="Buy Me A Coffee QR code" width="90">
     </td>
   </tr>
 </table>
+</p>
 
 # Bakery - KiCad Plugin
 

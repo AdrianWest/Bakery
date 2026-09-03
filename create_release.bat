@@ -93,6 +93,13 @@ if exist "plugins\resources\Banner-No-BK.png" (
     echo WARNING: plugins\resources\Banner-No-BK.png not found!
 )
 
+if exist "plugins\resources\qr-code.png" (
+    copy "plugins\resources\qr-code.png" "%RELEASE_DIR%\plugins\resources\" > nul
+    echo   - plugins\resources\qr-code.png copied
+) else (
+    echo WARNING: plugins\resources\qr-code.png not found!
+)
+
 echo Copying root-level resources...
 if exist "resources\icon.png" (
     copy "resources\icon.png" "%RELEASE_DIR%\resources\" > nul

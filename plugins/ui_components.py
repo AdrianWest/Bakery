@@ -34,6 +34,7 @@ separate panes for info, warning, and error messages.
 """
 
 import os
+import webbrowser
 from typing import Any, Dict
 
 try:
@@ -62,7 +63,9 @@ from .constants import (
     DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
     LOGGER_WINDOW_SIZE, LOG_FONT_SIZE, COLOR_WARNING_BG, COLOR_ERROR_BG,
     PROGRESS_BAR_RANGE, CONFIG_BANNER_DISPLAY_WIDTH, CONFIG_BANNER_FILE_NAME,
-    LOGGER_BANNER_DISPLAY_WIDTH, LOGGER_BANNER_FILE_NAME
+    LOGGER_BANNER_DISPLAY_WIDTH, LOGGER_BANNER_FILE_NAME,
+    COMPLETION_QR_DISPLAY_WIDTH, COMPLETION_QR_FILE_NAME,
+    COMPLETION_SUPPORT_MESSAGE, COMPLETION_SUPPORT_URL
 )
 from .utils import validate_library_name
 
@@ -105,27 +108,28 @@ CONFIG_FIELD_SPECS = (
 )
 
 
-def _load_banner_bitmap(file_name: str, display_width: int):
+def _load_resource_bitmap(file_name: str, display_width: int, description: str):
     """
-    @brief Load and scale a Bakery banner
+    @brief Load and scale a PNG image from the plugin resources directory
 
-    @param file_name: Banner image file name in the plugin resources directory
-    @param display_width: Width of the scaled banner in pixels
+    @param file_name: Image file name in the plugin resources directory
+    @param display_width: Width of the scaled image in pixels
+    @param description: Human-readable image description for diagnostics
     @return Scaled wx.Bitmap, or None when the banner cannot be loaded
     """
-    banner_path = os.path.join(
+    image_path = os.path.join(
         os.path.dirname(__file__),
         "resources",
         file_name
     )
 
-    if not os.path.isfile(banner_path):
-        print(f"Bakery banner not found: {banner_path}")
+    if not os.path.isfile(image_path):
+        print(f"Bakery {description} not found: {image_path}")
         return None
 
-    image = wx.Image(banner_path, wx.BITMAP_TYPE_PNG)
+    image = wx.Image(image_path, wx.BITMAP_TYPE_PNG)
     if not image.IsOk():
-        print(f"Bakery banner could not be loaded: {banner_path}")
+        print(f"Bakery {description} could not be loaded: {image_path}")
         return None
 
     scaled_height = round(
@@ -137,6 +141,95 @@ def _load_banner_bitmap(file_name: str, display_width: int):
         wx.IMAGE_QUALITY_HIGH
     )
     return wx.Bitmap(image)
+
+
+def _load_banner_bitmap(file_name: str, display_width: int):
+    """
+    @brief Load and scale a Bakery banner
+
+    @param file_name: Banner image file name in the plugin resources directory
+    @param display_width: Width of the scaled banner in pixels
+    @return Scaled wx.Bitmap, or None when the banner cannot be loaded
+    """
+    return _load_resource_bitmap(file_name, display_width, "banner")
+
+
+def show_completion_dialog(parent, completion_message: str) -> None:
+    """
+    @brief Show the localization completion dialog with support QR code
+
+    @param parent: Parent wx window, or None
+    @param completion_message: Localization summary text
+    """
+    dialog = wx.Dialog(parent, title="Bakery - Success", size=(660, 500))
+    main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+    title_label = wx.StaticText(dialog, label="Localization Complete!")
+    title_font = title_label.GetFont()
+    title_font.SetPointSize(round(title_font.GetPointSize() * 1.8))
+    title_font.SetWeight(wx.FONTWEIGHT_BOLD)
+    title_label.SetFont(title_font)
+    main_sizer.Add(title_label, 0, wx.ALIGN_CENTER | wx.TOP | wx.BOTTOM, 18)
+
+    summary_label = wx.StaticText(dialog, label=completion_message)
+    summary_font = summary_label.GetFont()
+    summary_font.SetPointSize(round(summary_font.GetPointSize() * 1.5))
+    summary_label.SetFont(summary_font)
+    main_sizer.Add(summary_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 25)
+
+    main_sizer.Add(wx.StaticLine(dialog), 0, wx.EXPAND | wx.ALL, 15)
+
+    support_sizer = wx.BoxSizer(wx.HORIZONTAL)
+    qr_bitmap = _load_resource_bitmap(
+        COMPLETION_QR_FILE_NAME,
+        COMPLETION_QR_DISPLAY_WIDTH,
+        "support QR code"
+    )
+    if qr_bitmap is not None:
+        qr_panel = wx.Panel(dialog)
+        qr_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
+        qr_sizer = wx.BoxSizer(wx.VERTICAL)
+        qr_image = wx.StaticBitmap(qr_panel, bitmap=qr_bitmap)
+        qr_sizer.Add(qr_image, 0, wx.ALIGN_CENTER | wx.ALL, 12)
+        qr_panel.SetSizer(qr_sizer)
+        support_sizer.Add(qr_panel, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 10)
+
+    support_text_sizer = wx.BoxSizer(wx.VERTICAL)
+    support_label = wx.StaticText(dialog, label=COMPLETION_SUPPORT_MESSAGE)
+    support_font = support_label.GetFont()
+    support_font.SetPointSize(round(support_font.GetPointSize() * 1.5))
+    support_label.SetFont(support_font)
+    support_label.Wrap(400)
+    support_text_sizer.Add(
+        support_label,
+        0,
+        wx.EXPAND | wx.BOTTOM,
+        12
+    )
+    coffee_button = wx.Button(dialog, label="Buy me a coffee")
+    coffee_button.Bind(
+        wx.EVT_BUTTON,
+        lambda event: webbrowser.open(COMPLETION_SUPPORT_URL)
+    )
+    support_text_sizer.Add(coffee_button, 0, wx.ALIGN_LEFT)
+    support_sizer.Add(
+        support_text_sizer,
+        1,
+        wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+        10
+    )
+    main_sizer.Add(support_sizer, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 25)
+
+    ok_button = wx.Button(dialog, wx.ID_OK, "OK")
+    ok_button.Bind(wx.EVT_BUTTON, lambda event: dialog.EndModal(wx.ID_OK))
+    main_sizer.Add(ok_button, 0, wx.ALIGN_CENTER | wx.ALL, 18)
+
+    dialog.SetSizer(main_sizer)
+    dialog.Centre()
+    try:
+        dialog.ShowModal()
+    finally:
+        dialog.Destroy()
 
 
 class ConfigDialog(wx.Dialog):

@@ -52,6 +52,13 @@ CONFIG_BANNER_DISPLAY_WIDTH = 490
 CONFIG_BANNER_FILE_NAME = "Banner-No-robot.png"
 LOGGER_BANNER_DISPLAY_WIDTH = 850
 LOGGER_BANNER_FILE_NAME = "Banner-No-BK.png"
+COMPLETION_QR_DISPLAY_WIDTH = 140
+COMPLETION_QR_FILE_NAME = "qr-code.png"
+COMPLETION_SUPPORT_URL = "https://www.buymeacoffee.com/Adrian_West"
+COMPLETION_SUPPORT_MESSAGE = (
+    "Bakery is completely free and open source. If you like it or it has "
+    "helped you, please consider buying me a coffee."
+)
 
 # Color schemes
 COLOR_WARNING_BG = (255, 252, 240)  # Light yellow

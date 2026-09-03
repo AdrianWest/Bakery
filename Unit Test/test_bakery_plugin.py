@@ -374,7 +374,8 @@ class TestBakeryPlugin(unittest.TestCase):
 
     def test_completion_counts_only_newly_copied_assets(self):
         """Completion counts exclude reused symbols and local footprints"""
-        plugin = load_bakery_plugin_module().BakeryPlugin()
+        plugin_module = load_bakery_plugin_module()
+        plugin = plugin_module.BakeryPlugin()
         plugin.logger = MagicMock()
         copied_footprints = [
             ("Source", "A", "target-a", "source-a", "dest-a"),
@@ -385,11 +386,12 @@ class TestBakeryPlugin(unittest.TestCase):
             ("Source", "B", "target-b", None)
         ]
 
-        plugin._complete_localization(
-            copied_footprints,
-            copied_symbols,
-            0
-        )
+        with patch.object(plugin_module, 'show_completion_dialog'):
+            plugin._complete_localization(
+                copied_footprints,
+                copied_symbols,
+                0
+            )
 
         info_messages = [
             call.args[0]

@@ -101,11 +101,11 @@ if exist "plugins\resources\qr-code.png" (
 )
 
 echo Copying root-level resources...
-if exist "resources\icon.png" (
-    copy "resources\icon.png" "%RELEASE_DIR%\resources\" > nul
-    echo   - resources\icon.png copied
+if exist "resources\Bakery_64x64_KiCad.png" (
+    copy "resources\Bakery_64x64_KiCad.png" "%RELEASE_DIR%\resources\icon.png" > nul
+    echo   - resources\Bakery_64x64_KiCad.png copied as resources\icon.png
 ) else (
-    echo WARNING: resources\icon.png not found!
+    echo WARNING: resources\Bakery_64x64_KiCad.png not found!
 )
 
 echo Copying root metadata.json (copy from plugins)...
@@ -167,12 +167,15 @@ echo.
 
 REM Create a temporary PowerShell script to update root metadata.json
 echo $json = Get-Content 'metadata.json' -Raw ^| ConvertFrom-Json > update_metadata.ps1
-echo $json.versions[0].version = '%VERSION%' >> update_metadata.ps1
-echo $json.versions[0].download_url = 'https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%' >> update_metadata.ps1
-echo $json.versions[0].download_sha256 = '%SHA256%' >> update_metadata.ps1
-echo $json.versions[0].download_size = [int]%ZIP_SIZE% >> update_metadata.ps1
-echo $json.versions[0].install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
-echo $json.versions[0].status = 'stable' >> update_metadata.ps1
+echo $versionEntry = $json.versions ^| Where-Object { $_.version -eq '%VERSION%' } ^| Select-Object -First 1 >> update_metadata.ps1
+echo if ($null -eq $versionEntry) { throw "metadata.json does not contain version %VERSION%" } >> update_metadata.ps1
+echo $versionEntry.download_url = 'https://github.com/AdrianWest/Bakery/releases/download/v%VERSION%/%ZIP_FILE%' >> update_metadata.ps1
+echo $versionEntry.download_sha256 = '%SHA256%' >> update_metadata.ps1
+echo $versionEntry.download_size = [int]%ZIP_SIZE% >> update_metadata.ps1
+echo $versionEntry.install_size = [int]%INSTALL_SIZE% >> update_metadata.ps1
+echo $versionEntry.status = 'stable' >> update_metadata.ps1
+echo $versionEntry.kicad_version = '10.0' >> update_metadata.ps1
+echo $versionEntry.kicad_version_max = '10.99' >> update_metadata.ps1
 echo $json ^| ConvertTo-Json -Depth 10 ^| Set-Content 'metadata.json' -Encoding UTF8 >> update_metadata.ps1
 echo. >> update_metadata.ps1
 echo # Update plugins/metadata.json with version and status only (no download fields) >> update_metadata.ps1

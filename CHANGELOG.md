@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scanned datasheet properties in both schematic and PCB files, including
   direct PCB-only PDF links, and resolved TI wrapper URLs before downloading.
 - Corrected completion totals so reused symbols and already-local footprints are not reported as newly copied.
+- Expanded the Windows KiCad 10 functional suite to reopen both the localized
+  PCB and root schematic after localization and idempotence checks.
+- Corrected release metadata descriptions and release packaging metadata
+  updates for the KiCad 10 v2.1.0 package.
 
 ## [1.1.0] - 2026-02-22
 

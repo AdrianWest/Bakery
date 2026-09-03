@@ -57,7 +57,8 @@ except ImportError:
         ID_CANCEL = 0
 
 from .constants import (
-    PLUGIN_VERSION, CONFIG_DIALOG_SIZE, CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
+    PLUGIN_VERSION, PLUGIN_REPOSITORY_URL, CONFIG_DIALOG_SIZE,
+    CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
     CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
     DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME,
     DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
@@ -241,6 +242,7 @@ class ConfigDialog(wx.Dialog):
     @section methods Methods
     - :py:meth:`~ConfigDialog.__init__`
     - :py:meth:`~ConfigDialog._add_text_setting`
+    - :py:meth:`~ConfigDialog.on_help`
     - :py:meth:`~ConfigDialog.on_ok`
     - :py:meth:`~ConfigDialog.on_cancel`
     - :py:meth:`~ConfigDialog.get_config`
@@ -292,6 +294,10 @@ class ConfigDialog(wx.Dialog):
         
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        help_btn = wx.Button(self, label="Help")
+        help_btn.Bind(wx.EVT_BUTTON, self.on_help)
+        button_sizer.Add(help_btn, 0, wx.ALL, 5)
         
         ok_btn = wx.Button(self, wx.ID_OK, "OK")
         ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
@@ -325,6 +331,14 @@ class ConfigDialog(wx.Dialog):
             5
         )
         return control
+
+    def on_help(self, event):
+        """
+        @brief Open the Bakery GitHub repository in the default browser
+
+        @param event: Button click event
+        """
+        webbrowser.open(PLUGIN_REPOSITORY_URL)
 
     def on_ok(self, event):
         """

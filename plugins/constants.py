@@ -44,6 +44,7 @@ PLUGIN_VERSION = "2.1.0"
 PLUGIN_NAME = "Bakery - Localize Symbols, Footprints, and 3D Models"
 PLUGIN_CATEGORY = "Library Management"
 PLUGIN_DESCRIPTION = "Localize all symbols and footprints to project libraries"
+PLUGIN_REPOSITORY_URL = "https://github.com/AdrianWest/Bakery"
 
 # UI Constants
 LOGGER_WINDOW_SIZE = (900, 850)

@@ -92,13 +92,27 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 2. Click the <img src="plugins/resources/Bakery_Icon.png" alt="Bakery" width="24" height="24"> icon in the
    top toolbar, or select **Tools** > **External Plugins** >
    **Bakery - Localize Symbols, Footprints, and 3d Models**.
-3. Choose the local library and folder names:
-   - Local library name for footprints (default: "MyLib")
-   - Symbol library name (default: "MySymbols")
-   - Symbol directory name (default: "Symbols")
-   - 3D models folder name (default: "3D Models")
-   - Datasheets directory name (default: "Data_Sheets")
+3. Choose the local library and folder names in the configuration dialog.
 4. Confirm the operation and leave KiCad open while Bakery completes.
+
+![Bakery configuration dialog](resources/config_dialog.png)
+
+### Configuration Dialog Fields
+
+These names control the project-local libraries and folders Bakery creates.
+The defaults are safe for most projects; change them only if you want different
+names in your KiCad project folder.
+
+| Field | What to enter | What Bakery creates or updates |
+|-------|---------------|--------------------------------|
+| **Local Footprint Library Name** | A KiCad library nickname, such as `MyLib` | A local footprint library folder named `MyLib.pretty` and an `fp-lib-table` entry for it |
+| **Symbol Library Name** | A KiCad symbol library nickname, such as `MySymbols` | A local symbol library file named `MySymbols.kicad_sym` and a `sym-lib-table` entry for it |
+| **Symbol Directory Name** | A folder name, such as `MySym` or `Symbols` | The folder that stores the local symbol library file |
+| **3D Models Directory Name** | A folder name, such as `3D Models` | The folder that stores copied STEP/WRL model files |
+| **Datasheets Directory Name** | A folder name, such as `Data_Sheets` | The folder that stores downloaded or copied PDF datasheets |
+
+Click **OK** to start localization, **Cancel** to exit without changes, or
+**Help** to open the Bakery GitHub repository.
 
 Bakery will:
    - Create `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip`

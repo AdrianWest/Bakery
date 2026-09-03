@@ -1,6 +1,10 @@
 ![Bakery KiCad Plugin banner](resources/Banner-No-robot.png)
 
 <p align="center">
+  <strong>If Bakery has helped you in any way please consider buying me a coffee</strong>
+</p>
+
+<p align="center">
 <table align="center">
   <tr>
     <td align="center">

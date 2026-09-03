@@ -78,8 +78,20 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 2. Copy the `plugins` folder contents to your KiCad plugins directory:
    - **Windows**: `%USERPROFILE%\Documents\KiCad\10.0\scripting\plugins\Bakery\`
    - **Linux**: `~/.kicad/10.0/scripting/plugins/Bakery/`
+   - **Linux (Flatpak)**: `~/.var/app/org.kicad.KiCad/data/kicad/10.0/scripting/plugins/Bakery/`
    - **macOS**: `~/Library/Preferences/kicad/10.0/scripting/plugins/Bakery/`
+
+   > **Note (Flatpak):** KiCad installed via Flatpak runs in a sandbox and
+   > does not see `~/.kicad/...`. Copy the plugin into the sandboxed data
+   > directory shown above, or KiCad will not detect it. After copying,
+   > fully quit KiCad (not just close the window) before relaunching so it
+   > rescans the plugins folder.
 3. Restart KiCad
+
+> **Note:** Bakery currently supports **KiCad 10.x only**. If you are still
+> on KiCad 9.x (including Flatpak builds), use the last 9.x-compatible
+> release, [v1.1.0](https://github.com/AdrianWest/Bakery/releases/tag/v1.1.0),
+> instead of the current release.
 
 ## How To Use Bakery
 

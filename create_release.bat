@@ -101,11 +101,11 @@ if exist "plugins\resources\qr-code.png" (
 )
 
 echo Copying root-level resources...
-if exist "resources\Bakery_64x64_KiCad.png" (
-    copy "resources\Bakery_64x64_KiCad.png" "%RELEASE_DIR%\resources\icon.png" > nul
-    echo   - resources\Bakery_64x64_KiCad.png copied as resources\icon.png
+if exist "resources\Bakery_64x64_KiCad_Basket.png" (
+    copy "resources\Bakery_64x64_KiCad_Basket.png" "%RELEASE_DIR%\resources\icon.png" > nul
+    echo   - resources\Bakery_64x64_KiCad_Basket.png copied as resources\icon.png
 ) else (
-    echo WARNING: resources\Bakery_64x64_KiCad.png not found!
+    echo WARNING: resources\Bakery_64x64_KiCad_Basket.png not found!
 )
 
 echo Copying root metadata.json (copy from plugins)...

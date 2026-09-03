@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file bakery_plugin.py
 
 @brief Main plugin module for Bakery KiCad Plugin
@@ -36,7 +33,6 @@ by coordinating FootprintLocalizer, SymbolLocalizer, and LibraryManager componen
 """
 
 import os
-from typing import Dict, Any
 import pcbnew
 import wx
 
@@ -45,24 +41,28 @@ from .constants import (
     PLUGIN_NAME, PLUGIN_CATEGORY, PLUGIN_DESCRIPTION,
     ERROR_NO_BOARD, ERROR_PROJECT_NOT_SAVED, CONFIRM_LOCALIZATION,
     CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME, CONFIG_SYMBOL_DIR_NAME,
-    CONFIG_MODELS_DIR_NAME, CONFIG_CREATE_BACKUPS, CONFIG_DATASHEETS_DIR_NAME,
+    CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
     DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_DIR_NAME,
     DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
     PROGRESS_STEP_SCAN_PCB, PROGRESS_STEP_SCAN_SCHEMATICS, PROGRESS_STEP_SCAN_SYMBOLS,
+    PROGRESS_STEP_BACKUP_PROJECT,
     PROGRESS_STEP_COPY_FOOTPRINTS, PROGRESS_STEP_COPY_SYMBOLS, PROGRESS_STEP_COPY_3D_MODELS,
     PROGRESS_STEP_UPDATE_PCB, PROGRESS_STEP_UPDATE_SCHEMATICS,
     PROGRESS_STEP_UPDATE_LIB_TABLE, PROGRESS_STEP_UPDATE_SYM_LIB_TABLE,
     SUCCESS_LOCALIZATION_COMPLETE, PROGRESS_INITIAL, PROGRESS_BAR_RANGE,
-    PROGRESS_PCT_SCAN_PCB, PROGRESS_PCT_SCAN_SCHEMATICS, PROGRESS_PCT_COPY_FOOTPRINTS,
+    PROGRESS_PCT_BACKUP_PROJECT, PROGRESS_PCT_SCAN_PCB,
+    PROGRESS_PCT_SCAN_SCHEMATICS, PROGRESS_PCT_COPY_FOOTPRINTS,
     PROGRESS_PCT_COPY_3D_MODELS, PROGRESS_PCT_UPDATE_LIB_TABLE, PROGRESS_PCT_UPDATE_PCB,
     PROGRESS_PCT_UPDATE_SCHEMATICS, PROGRESS_PCT_SCAN_SYMBOLS, PROGRESS_PCT_COPY_SYMBOLS,
     PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, PROGRESS_PCT_UPDATE_SYMBOL_REFS, PROGRESS_COMPLETE
 )
-from .ui_components import BakeryLogger, ConfigDialog
+from .ui_components import BakeryLogger, ConfigDialog, show_completion_dialog
 from .footprint_localizer import FootprintLocalizer
 from .symbol_localizer import SymbolLocalizer
 from .data_sheet_localizer import DataSheetLocalizer
 from .library_manager import LibraryManager
+from .backup_manager import BackupManager
+from .utils import find_schematic_files
 
 
 class BakeryPlugin(pcbnew.ActionPlugin):
@@ -95,8 +95,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             CONFIG_SYMBOL_DIR_NAME: DEFAULT_SYMBOL_DIR_NAME,
             CONFIG_LOCAL_LIB_NAME: DEFAULT_LOCAL_LIB_NAME,
             CONFIG_MODELS_DIR_NAME: DEFAULT_MODELS_DIR_NAME,
-            CONFIG_DATASHEETS_DIR_NAME: DEFAULT_DATASHEETS_DIR_NAME,
-            CONFIG_CREATE_BACKUPS: False
+            CONFIG_DATASHEETS_DIR_NAME: DEFAULT_DATASHEETS_DIR_NAME
         }
     
     def defaults(self):
@@ -147,7 +146,8 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             
             # Show configuration dialog
             config_dlg = ConfigDialog(None, self.config)
-            if config_dlg.ShowModal() != wx.ID_OK:
+            dialog_result = config_dlg.ShowModal()
+            if dialog_result != wx.ID_OK:
                 config_dlg.Destroy()
                 return
             
@@ -179,7 +179,6 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                 self.logger.error(f"Error during localization: {str(e)}")
                 import traceback
                 self.logger.error(traceback.format_exc())
-            
             finally:
                 self.logger.enable_close()
                 # Switch to modal to wait for user to close
@@ -210,46 +209,114 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.logger.info(f"Configuration: Library={self.config[CONFIG_LOCAL_LIB_NAME]}, "
                         f"Symbols={self.config[CONFIG_SYMBOL_LIB_NAME]}, "
                         f"Models={self.config[CONFIG_MODELS_DIR_NAME]}, "
-                        f"Datasheets={self.config[CONFIG_DATASHEETS_DIR_NAME]}, "
-                        f"Backups={self.config[CONFIG_CREATE_BACKUPS]}")
-        
-        import glob
-        from .constants import EXTENSION_SCHEMATIC
+                        f"Datasheets={self.config[CONFIG_DATASHEETS_DIR_NAME]}")
 
-        # Create localizers
+        self.logger.set_progress(
+            PROGRESS_PCT_BACKUP_PROJECT,
+            PROGRESS_BAR_RANGE,
+            PROGRESS_STEP_BACKUP_PROJECT
+        )
+        project_name = os.path.splitext(os.path.basename(project_path))[0]
+        BackupManager(self.logger).create_project_backup(
+            project_dir,
+            project_name
+        )
+
         fp_localizer = FootprintLocalizer(self.logger)
         sym_localizer = SymbolLocalizer(self.logger)
         lib_manager = LibraryManager(self.logger)
 
-        # Check if schematic files are locked before starting
+        if not self._schematics_are_available(fp_localizer, project_dir):
+            return
+
+        copied_footprints = self._localize_footprints(
+            board,
+            project_path,
+            project_dir,
+            fp_localizer,
+            lib_manager
+        )
+        copied_symbols = self._localize_symbols(project_dir, sym_localizer)
+        datasheets_processed = self._localize_datasheets(
+            project_dir,
+            board
+        )
+        try:
+            board.Save(project_path)
+            self.logger.info("Final PCB save completed successfully")
+        except Exception as error:
+            self.logger.error(f"Failed to save final PCB state: {error}")
+            raise
+        fp_localizer.update_pcb_model_paths(
+            project_path,
+            project_dir,
+            self.config[CONFIG_MODELS_DIR_NAME]
+        )
+
+        self._complete_localization(
+            copied_footprints,
+            copied_symbols,
+            datasheets_processed
+        )
+
+    def _schematics_are_available(
+        self,
+        fp_localizer: FootprintLocalizer,
+        project_dir: str
+    ) -> bool:
+        """
+        @brief Ensure schematic files are not locked by an editor
+
+        @param fp_localizer: Footprint localizer used for lock detection
+        @param project_dir: Project directory path
+        @return True when localization may continue
+        """
         self.logger.info("Checking for open schematic files...")
         locked_files = fp_localizer.check_schematic_locks(project_dir)
-        if locked_files:
-            self.logger.warning(f"The following schematic file(s) are currently open: {', '.join(locked_files)}")
-            self.logger.error("Please close all schematic editors before running this plugin")
-            wx.MessageBox(
-                f"Cannot proceed - schematic files are open:\n\n" +
-                "\n".join(locked_files) +
-                "\n\nPlease close the schematic editor and try again.",
-                "Schematic Files Locked",
-                wx.OK | wx.ICON_WARNING
-            )
-            return
-        
-        # === FOOTPRINT LOCALIZATION ===
-        
-        # Step 1: Scan for footprints
+        if not locked_files:
+            return True
+
+        self.logger.warning(
+            "The following schematic file(s) are currently open: "
+            + ", ".join(locked_files)
+        )
+        self.logger.error(
+            "Please close all schematic editors before running this plugin"
+        )
+        wx.MessageBox(
+            "Cannot proceed - schematic files are open:\n\n"
+            + "\n".join(locked_files)
+            + "\n\nPlease close the schematic editor and try again.",
+            "Schematic Files Locked",
+            wx.OK | wx.ICON_WARNING
+        )
+        return False
+
+    def _localize_footprints(
+        self,
+        board,
+        project_path: str,
+        project_dir: str,
+        fp_localizer: FootprintLocalizer,
+        lib_manager: LibraryManager
+    ) -> list:
+        """
+        @brief Run footprint and 3D model localization
+
+        @param board: KiCad BOARD object
+        @param project_path: PCB file path
+        @param project_dir: Project directory path
+        @param fp_localizer: Footprint localization service
+        @param lib_manager: Library table management service
+        @return Copied footprint records
+        """
         self.logger.set_progress(PROGRESS_PCT_SCAN_PCB, PROGRESS_BAR_RANGE, PROGRESS_STEP_SCAN_PCB)
         pcb_footprints = fp_localizer.scan_pcb_footprints(board)
-        
         self.logger.set_progress(PROGRESS_PCT_SCAN_SCHEMATICS, PROGRESS_BAR_RANGE, PROGRESS_STEP_SCAN_SCHEMATICS)
         sch_footprints = fp_localizer.scan_schematic_footprints(project_dir)
-        
-        # Combine footprints from both sources
         all_footprints = pcb_footprints.union(sch_footprints)
         self.logger.info(f"Total unique footprints found: {len(all_footprints)}")
-        
-        # Step 2: Copy footprints
+
         self.logger.set_progress(PROGRESS_PCT_COPY_FOOTPRINTS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_FOOTPRINTS)
         copied_footprints = []
         if all_footprints:
@@ -258,173 +325,172 @@ class BakeryPlugin(pcbnew.ActionPlugin):
                 project_dir,
                 self.config[CONFIG_LOCAL_LIB_NAME]
             )
-        
-        # Step 3: Localize 3D models
-        if copied_footprints:
-            self.logger.set_progress(PROGRESS_PCT_COPY_3D_MODELS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_3D_MODELS)
-            fp_localizer.localize_3d_models(
-                copied_footprints,
-                project_dir,
-                self.config[CONFIG_MODELS_DIR_NAME]
-            )
-            
-            # Step 4: Update footprint library table
-            self.logger.set_progress(PROGRESS_PCT_UPDATE_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_LIB_TABLE)
-            lib_manager.update_fp_lib_table(project_dir, self.config[CONFIG_LOCAL_LIB_NAME])
-            
-            # Step 5: Update PCB references
-            self.logger.set_progress(PROGRESS_PCT_UPDATE_PCB, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_PCB)
-            fp_localizer.update_pcb_references(
-                board,
-                copied_footprints,
-                project_path,
-                self.config[CONFIG_LOCAL_LIB_NAME],
-                self.config[CONFIG_CREATE_BACKUPS]
-            )
-            
-            # Step 6: Update schematic footprint references
-            self.logger.set_progress(PROGRESS_PCT_UPDATE_SCHEMATICS, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_SCHEMATICS)
-            fp_localizer.update_schematic_references(
-                copied_footprints,
-                project_dir,
-                self.config[CONFIG_LOCAL_LIB_NAME],
-                self.config[CONFIG_CREATE_BACKUPS]
-            )
-        else:
+
+        if not copied_footprints:
             self.logger.info("No footprints to copy")
-        
-        # === SYMBOL LOCALIZATION ===
-        
-        # Step 7: Scan for symbols
+            return []
+
+        self.logger.set_progress(PROGRESS_PCT_COPY_3D_MODELS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_3D_MODELS)
+        fp_localizer.localize_3d_models(
+            copied_footprints,
+            project_dir,
+            self.config[CONFIG_MODELS_DIR_NAME]
+        )
+        self.logger.set_progress(PROGRESS_PCT_UPDATE_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_LIB_TABLE)
+        if not lib_manager.update_fp_lib_table(
+            project_dir,
+            self.config[CONFIG_LOCAL_LIB_NAME]
+        ):
+            raise RuntimeError(
+                "Footprint library table update failed; references were not changed"
+            )
+        self.logger.set_progress(PROGRESS_PCT_UPDATE_PCB, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_PCB)
+        fp_localizer.update_pcb_references(
+            board,
+            copied_footprints,
+            project_path,
+            self.config[CONFIG_LOCAL_LIB_NAME]
+        )
+        self.logger.set_progress(PROGRESS_PCT_UPDATE_SCHEMATICS, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_SCHEMATICS)
+        fp_localizer.update_schematic_references(
+            copied_footprints,
+            project_dir,
+            self.config[CONFIG_LOCAL_LIB_NAME]
+        )
+        return copied_footprints
+
+    def _localize_symbols(
+        self,
+        project_dir: str,
+        sym_localizer: SymbolLocalizer
+    ) -> list:
+        """
+        @brief Run symbol localization
+
+        @param project_dir: Project directory path
+        @param sym_localizer: Symbol localization service
+        @return Copied symbol records
+        """
         self.logger.set_progress(PROGRESS_PCT_SCAN_SYMBOLS, PROGRESS_BAR_RANGE, PROGRESS_STEP_SCAN_SYMBOLS)
         all_symbols = sym_localizer.scan_schematic_symbols(project_dir)
         self.logger.info(f"Total unique symbols found: {len(all_symbols)}")
-        
-        # Step 8: Copy symbols
-        copied_symbols = []
-        if all_symbols:
-            self.logger.set_progress(PROGRESS_PCT_COPY_SYMBOLS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_SYMBOLS)
-            copied_symbols = sym_localizer.copy_symbols(
-                all_symbols,
-                project_dir,
-                self.config[CONFIG_SYMBOL_LIB_NAME],
-                self.config[CONFIG_SYMBOL_DIR_NAME]
-            )
-            
-            if copied_symbols:
-                # Step 9: Update symbol library table
-                self.logger.set_progress(PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_SYM_LIB_TABLE)
-                sym_localizer.update_sym_lib_table(
-                    project_dir,
-                    self.config[CONFIG_SYMBOL_LIB_NAME],
-                    self.config[CONFIG_SYMBOL_DIR_NAME]
-                )
-                
-                # Step 10: Update schematic symbol references
-                self.logger.set_progress(PROGRESS_PCT_UPDATE_SYMBOL_REFS, PROGRESS_BAR_RANGE, "Updating Symbol References")
-                sym_localizer.update_schematic_references(
-                    copied_symbols,
-                    project_dir,
-                    self.config[CONFIG_SYMBOL_LIB_NAME],
-                    self.config[CONFIG_CREATE_BACKUPS]
-                )
-            else:
-                self.logger.info("No symbols to copy")
-        else:
+        if not all_symbols:
             self.logger.info("No symbols found in schematics")
-        
-        # === DATASHEET LOCALIZATION ===
-        
-        # Step 11: Localize datasheets
-        datasheets_processed = 0
-        datasheets_files_updated = 0
+            return []
 
-        # Get symbol library path and schematic files regardless of whether
-        # symbols were just copied - datasheets must also run on re-runs where
-        # symbols were already localised in a previous pass.
+        self.logger.set_progress(PROGRESS_PCT_COPY_SYMBOLS, PROGRESS_BAR_RANGE, PROGRESS_STEP_COPY_SYMBOLS)
+        copied_symbols = sym_localizer.copy_symbols(
+            all_symbols,
+            project_dir,
+            self.config[CONFIG_SYMBOL_LIB_NAME],
+            self.config[CONFIG_SYMBOL_DIR_NAME]
+        )
+        if not copied_symbols:
+            self.logger.info("No symbols to copy")
+            return []
+
+        self.logger.set_progress(PROGRESS_PCT_UPDATE_SYM_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_SYM_LIB_TABLE)
+        if not sym_localizer.update_sym_lib_table(
+            project_dir,
+            self.config[CONFIG_SYMBOL_LIB_NAME],
+            self.config[CONFIG_SYMBOL_DIR_NAME]
+        ):
+            raise RuntimeError(
+                "Symbol library table update failed; references were not changed"
+            )
+        self.logger.set_progress(PROGRESS_PCT_UPDATE_SYMBOL_REFS, PROGRESS_BAR_RANGE, "Updating Symbol References")
+        sym_localizer.update_schematic_references(
+            copied_symbols,
+            project_dir,
+            self.config[CONFIG_SYMBOL_LIB_NAME]
+        )
+        return copied_symbols
+
+    def _localize_datasheets(
+        self,
+        project_dir: str,
+        board
+    ) -> int:
+        """
+        @brief Run datasheet localization for local symbols and schematics
+
+        @param project_dir: Project directory path
+        @param board: Active KiCad BOARD object
+        @return Number of datasheets processed
+        """
+
         symbol_lib_path = os.path.join(
             project_dir,
             self.config[CONFIG_SYMBOL_DIR_NAME],
             f"{self.config[CONFIG_SYMBOL_LIB_NAME]}.kicad_sym"
         )
         symbol_libs = [symbol_lib_path] if os.path.exists(symbol_lib_path) else []
-        schematic_files = glob.glob(os.path.join(project_dir, f"*{EXTENSION_SCHEMATIC}"))
+        schematic_files = find_schematic_files(project_dir)
 
-        datasheet_localizer = None
-        if symbol_libs or schematic_files:
-            self.logger.info("Starting datasheet localization...")
-            datasheet_localizer = DataSheetLocalizer(
-                project_dir,
-                self.config[CONFIG_DATASHEETS_DIR_NAME],
-                self.logger
-            )
+        self.logger.info("Starting datasheet localization...")
+        datasheet_localizer = DataSheetLocalizer(
+            project_dir,
+            self.config[CONFIG_DATASHEETS_DIR_NAME],
+            self.logger
+        )
+        processed, files_updated = datasheet_localizer.localize_all_datasheets(
+            symbol_libs,
+            schematic_files,
+            board=board
+        )
+        self.logger.info(
+            f"Datasheet localization complete: {processed} datasheets "
+            f"processed, {files_updated} files updated"
+        )
+        return processed
 
-            # Localize datasheets
-            datasheets_processed, datasheets_files_updated = datasheet_localizer.localize_all_datasheets(
-                symbol_libs,
-                schematic_files
-            )
+    def _complete_localization(
+        self,
+        copied_footprints: list,
+        copied_symbols: list,
+        datasheets_processed: int
+    ) -> None:
+        """
+        @brief Report localization results and show the completion dialog
 
-            self.logger.info(f"Datasheet localization complete: {datasheets_processed} datasheets processed, "
-                           f"{datasheets_files_updated} files updated")
-        else:
-            self.logger.info("No symbol library or schematic files found, skipping datasheet localization")
+        @param copied_footprints: Copied footprint records
+        @param copied_symbols: Copied symbol records
+        @param datasheets_processed: Number of processed datasheets
+        """
+        footprint_copy_count = sum(
+            1
+            for record in copied_footprints
+            if len(record) >= 5 and record[3] != record[4]
+        )
+        symbol_copy_count = sum(
+            1
+            for record in copied_symbols
+            if len(record) >= 4 and record[3] is not None
+        )
 
-        # Persist the final in-memory board state after all localization steps.
-        try:
-            board.Save(project_path)
-            self.logger.info("Final PCB save completed successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to save final PCB state: {e}")
-            raise
-        fp_localizer.update_pcb_model_paths(project_path)
-        
-        # Complete
         self.logger.set_progress(PROGRESS_COMPLETE, PROGRESS_BAR_RANGE, "Complete")
         self.logger.success(SUCCESS_LOCALIZATION_COMPLETE)
-        
-        if copied_footprints or copied_symbols:
-            self.logger.info(f"Copied {len(copied_footprints)} footprints and {len(copied_symbols)} symbols to local libraries.")
+
+        if footprint_copy_count or symbol_copy_count:
+            self.logger.info(
+                f"Copied {footprint_copy_count} footprints and "
+                f"{symbol_copy_count} symbols to local libraries."
+            )
             if datasheets_processed > 0:
                 self.logger.info(f"Processed {datasheets_processed} datasheets.")
             self.logger.info(f"All references have been updated to use local libraries.")
         else:
             self.logger.info("All footprints and symbols were already in local libraries.")
-        
-        # Show backup information
-        all_backups = []
-        if copied_footprints:
-            all_backups.extend(fp_localizer.backup_manager.get_backups())
-        if copied_symbols:
-            all_backups.extend(sym_localizer.backup_manager.get_backups())
-        if datasheet_localizer:
-            all_backups.extend(datasheet_localizer.backup_manager.get_backups())
-        
-        if all_backups:
-            self.logger.info(f"Backups created: {len(all_backups)} file(s)")
-            for backup in all_backups:
-                self.logger.info(f"  - {os.path.basename(backup)}")
-        
-        # Reset progress bar and show completion dialog
+
         self.logger.set_progress(PROGRESS_INITIAL, PROGRESS_BAR_RANGE, "")
-        
-        # Show completion dialog
         completion_msg = (
-            f"Localization Complete!\n\n"
-            f"• {len(copied_footprints)} footprints copied\n"
-            f"• {len(copied_symbols)} symbols copied\n"
+            f"• {footprint_copy_count} footprints copied\n"
+            f"• {symbol_copy_count} symbols copied\n"
         )
         if datasheets_processed > 0:
             completion_msg += f"• {datasheets_processed} datasheets processed\n"
         completion_msg += (
-            f"• {len(all_backups)} backup(s) created\n\n"
-            f"All references have been updated to use local libraries."
+            "\nAll references have been updated to use local libraries."
         )
         
-        wx.MessageBox(
-            completion_msg,
-            "Bakery - Success",
-            wx.OK | wx.ICON_INFORMATION
-        )
-
-
+        show_completion_dialog(None, completion_msg)

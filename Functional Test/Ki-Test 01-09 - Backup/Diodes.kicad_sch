@@ -8,7 +8,7 @@
 		(title "3 Phase Rectifyer")
 	)
 	(lib_symbols
-		(symbol "Diode:1N4004"
+		(symbol "MySymbols:1N4004"
 			(pin_numbers
 				(hide yes)
 			)
@@ -34,7 +34,7 @@
 					)
 				)
 			)
-			(property "Footprint" "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal"
+			(property "Footprint" "MyLib:D_DO-41_SOD81_P10.16mm_Horizontal"
 				(at 0 -4.445 0)
 				(effects
 					(font
@@ -43,7 +43,7 @@
 					(hide yes)
 				)
 			)
-			(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+			(property "Datasheet" "${KIPRJMOD}/Data_Sheets/1n4001.pdf"
 				(at 0 0 0)
 				(effects
 					(font
@@ -678,7 +678,7 @@
 		(uuid "ecfe8498-9ee0-4bdd-851f-6b1fe1d7e9e3")
 	)
 	(symbol
-		(lib_id "Diode:1N4004")
+		(lib_id "MySymbols:1N4004")
 		(at 133.35 73.66 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -712,7 +712,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+		(property "Datasheet" "https://diotec.com/request/datasheet/1n4001.pdf"
 			(at 133.35 73.66 0)
 			(effects
 				(font
@@ -772,7 +772,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Diode:1N4004")
+		(lib_id "MySymbols:1N4004")
 		(at 133.35 95.25 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -806,7 +806,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+		(property "Datasheet" "https://diotec.com/request/datasheet/1n4001.pdf"
 			(at 133.35 95.25 0)
 			(effects
 				(font
@@ -866,7 +866,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Diode:1N4004")
+		(lib_id "MySymbols:1N4004")
 		(at 144.78 73.66 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -900,7 +900,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+		(property "Datasheet" "https://diotec.com/request/datasheet/1n4001.pdf"
 			(at 144.78 73.66 0)
 			(effects
 				(font
@@ -960,7 +960,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Diode:1N4004")
+		(lib_id "MySymbols:1N4004")
 		(at 144.78 95.25 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -994,7 +994,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+		(property "Datasheet" "https://diotec.com/request/datasheet/1n4001.pdf"
 			(at 144.78 95.25 0)
 			(effects
 				(font
@@ -1128,7 +1128,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Diode:1N4004")
+		(lib_id "MySymbols:1N4004")
 		(at 156.21 95.25 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -1162,7 +1162,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+		(property "Datasheet" "https://diotec.com/request/datasheet/1n4001.pdf"
 			(at 156.21 95.25 0)
 			(effects
 				(font
@@ -1444,7 +1444,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Diode:1N4004")
+		(lib_id "MySymbols:1N4004")
 		(at 156.21 73.66 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -1480,7 +1480,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+		(property "Datasheet" "https://diotec.com/request/datasheet/1n4001.pdf"
 			(at 156.21 73.66 0)
 			(effects
 				(font

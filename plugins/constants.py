@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file constants.py
 
 @brief Configuration constants for Bakery KiCad Plugin
@@ -43,14 +40,26 @@ to maintain consistency and simplify maintenance.
 
 
 # Plugin metadata
-PLUGIN_VERSION = "2.0.0"
+PLUGIN_VERSION = "2.1.0"
 PLUGIN_NAME = "Bakery - Localize Symbols, Footprints, and 3D Models"
 PLUGIN_CATEGORY = "Library Management"
 PLUGIN_DESCRIPTION = "Localize all symbols and footprints to project libraries"
+PLUGIN_REPOSITORY_URL = "https://github.com/AdrianWest/Bakery"
 
 # UI Constants
-LOGGER_WINDOW_SIZE = (900, 700)
-CONFIG_DIALOG_SIZE = (450, 400)
+LOGGER_WINDOW_SIZE = (900, 850)
+CONFIG_DIALOG_SIZE = (520, 610)
+CONFIG_BANNER_DISPLAY_WIDTH = 490
+CONFIG_BANNER_FILE_NAME = "Banner-No-robot.png"
+LOGGER_BANNER_DISPLAY_WIDTH = 850
+LOGGER_BANNER_FILE_NAME = "Banner-No-BK.png"
+COMPLETION_QR_DISPLAY_WIDTH = 140
+COMPLETION_QR_FILE_NAME = "qr-code.png"
+COMPLETION_SUPPORT_URL = "https://www.buymeacoffee.com/Adrian_West"
+COMPLETION_SUPPORT_MESSAGE = (
+    "Bakery is completely free and open source. If you like it or it has "
+    "helped you, please consider buying me a coffee."
+)
 
 # Color schemes
 COLOR_WARNING_BG = (255, 252, 240)  # Light yellow
@@ -66,6 +75,7 @@ PROGRESS_COMPLETE = 100
 
 # Progress step percentages
 PROGRESS_PCT_SCAN_PCB = 5
+PROGRESS_PCT_BACKUP_PROJECT = 2
 PROGRESS_PCT_SCAN_SCHEMATICS = 10
 PROGRESS_PCT_COPY_FOOTPRINTS = 20
 PROGRESS_PCT_COPY_3D_MODELS = 30
@@ -101,6 +111,10 @@ DEFAULT_SYMBOL_DIR_NAME = "MySym"
 DEFAULT_MODELS_DIR_NAME = "3D Models"
 DEFAULT_DATASHEETS_DIR_NAME = "Data_Sheets"
 
+# KiCad-compatible project ZIP backups
+PROJECT_BACKUP_DIRECTORY_SUFFIX = "-backups"
+PROJECT_BACKUP_TIMESTAMP_FORMAT = "%Y-%m-%d_%H%M%S"
+
 # File extensions
 EXTENSION_FOOTPRINT = ".kicad_mod"
 EXTENSION_FOOTPRINT_LIB = ".pretty"
@@ -131,10 +145,6 @@ KICAD_ENV_FOOTPRINT_DIR = "FOOTPRINT_DIR"
 KICAD_ENV_3DMODEL_DIR = "3DMODEL_DIR"
 KICAD_ENV_SYMBOL_DIR = "SYMBOL_DIR"
 
-# Backup settings
-BACKUP_SUFFIX = ".bak"
-BACKUP_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
-
 # S-expression keywords
 SEXPR_LIB = "lib"
 SEXPR_NAME = "name"
@@ -150,12 +160,18 @@ SEXPR_SYM_LIB_TABLE = "sym_lib_table"
 SEXPR_SYMBOL = "symbol"
 SEXPR_LIB_SYMBOLS = "kicad_symbol_lib"
 SEXPR_LIB_ID = "lib_id"
+SEXPR_DATASHEET = "Datasheet"
+SEXPR_EXTENDS = "extends"
+SEXPR_VERSION = "version"
+SEXPR_GENERATOR = "generator"
+SEXPR_GENERATOR_VERSION = "generator_version"
 
 # Library type
 LIBRARY_TYPE_KICAD = "KiCad"
 
 # Progress tracking
 PROGRESS_STEP_SCAN_PCB = "Scanning PCB"
+PROGRESS_STEP_BACKUP_PROJECT = "Backing Up Project"
 PROGRESS_STEP_SCAN_SCHEMATICS = "Scanning Schematics"
 PROGRESS_STEP_SCAN_SYMBOLS = "Scanning Symbols"
 PROGRESS_STEP_COPY_FOOTPRINTS = "Copying Footprints"
@@ -169,8 +185,6 @@ PROGRESS_STEP_UPDATE_SYM_LIB_TABLE = "Updating Symbol Library Table"
 # Error messages
 ERROR_NO_BOARD = "No board loaded. Please open a PCB file first."
 ERROR_PROJECT_NOT_SAVED = "Please save the project before running Bakery."
-ERROR_BACKUP_FAILED = "Failed to create backup file"
-
 # Success messages
 SUCCESS_LOCALIZATION_COMPLETE = "Localization complete!"
 
@@ -186,4 +200,3 @@ CONFIG_SYMBOL_LIB_NAME = "symbol_lib_name"
 CONFIG_SYMBOL_DIR_NAME = "symbol_dir_name"
 CONFIG_MODELS_DIR_NAME = "models_dir_name"
 CONFIG_DATASHEETS_DIR_NAME = "datasheets_dir_name"
-CONFIG_CREATE_BACKUPS = "create_backups"

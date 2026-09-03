@@ -29,7 +29,6 @@ This runs a quick smoke test to verify the test environment is set up correctly.
 | `test_constants.py` | Constants and configuration | Plugin metadata, UI constants, file extensions |
 | `test_utils.py` | Utility functions | Path validation, file operations, library name validation |
 | `test_sexpr_parser.py` | S-expression parser | Parsing, serialization, caching |
-| `test_backup_manager.py` | File backup system | Backup creation, tracking, timestamping |
 | `test_library_manager.py` | Library management | Library creation, path expansion, fp-lib-table updates |
 | `test_base_localizer.py` | Base localizer class | Common functionality, file locking, schematic scanning |
 | `test_footprint_localizer.py` | Footprint localization | PCB scanning, footprint copying, 3D model localization |

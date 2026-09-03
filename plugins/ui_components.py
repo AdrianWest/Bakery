@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file ui_components.py
 
 @brief User interface components for Bakery plugin
@@ -36,7 +33,9 @@ separate panes for info, warning, and error messages.
 - Logger window supports both modeless (during operation) and modal (at completion) modes
 """
 
-from typing import Dict, Any
+import os
+import webbrowser
+from typing import Any, Dict
 
 try:
     import wx
@@ -46,21 +45,192 @@ except ImportError:
     WX_AVAILABLE = False
     # Create dummy base classes
     class wx:
+        """!
+        @brief Minimal wx fallback used when importing outside KiCad.
+        """
+
         Dialog = object
         Frame = object
         OK = 1
         CANCEL = 0
         ID_OK = 1
+        ID_CANCEL = 0
 
 from .constants import (
-    PLUGIN_VERSION, CONFIG_DIALOG_SIZE, CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
+    PLUGIN_VERSION, PLUGIN_REPOSITORY_URL, CONFIG_DIALOG_SIZE,
+    CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
     CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
-    CONFIG_CREATE_BACKUPS, DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME,
+    DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME,
     DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
     LOGGER_WINDOW_SIZE, LOG_FONT_SIZE, COLOR_WARNING_BG, COLOR_ERROR_BG,
-    PROGRESS_BAR_RANGE
+    PROGRESS_BAR_RANGE, CONFIG_BANNER_DISPLAY_WIDTH, CONFIG_BANNER_FILE_NAME,
+    LOGGER_BANNER_DISPLAY_WIDTH, LOGGER_BANNER_FILE_NAME,
+    COMPLETION_QR_DISPLAY_WIDTH, COMPLETION_QR_FILE_NAME,
+    COMPLETION_SUPPORT_MESSAGE, COMPLETION_SUPPORT_URL
 )
 from .utils import validate_library_name
+
+CONFIG_FIELD_SPECS = (
+    (
+        "Local Footprint Library Name:",
+        "Footprint library name",
+        CONFIG_LOCAL_LIB_NAME,
+        DEFAULT_LOCAL_LIB_NAME,
+        "lib_name_ctrl"
+    ),
+    (
+        "Symbol Library Name:",
+        "Symbol library name",
+        CONFIG_SYMBOL_LIB_NAME,
+        DEFAULT_SYMBOL_LIB_NAME,
+        "sym_lib_name_ctrl"
+    ),
+    (
+        "Symbol Directory Name:",
+        "Symbol directory name",
+        CONFIG_SYMBOL_DIR_NAME,
+        DEFAULT_SYMBOL_DIR_NAME,
+        "sym_dir_ctrl"
+    ),
+    (
+        "3D Models Directory Name:",
+        "3D models directory name",
+        CONFIG_MODELS_DIR_NAME,
+        DEFAULT_MODELS_DIR_NAME,
+        "models_dir_ctrl"
+    ),
+    (
+        "Datasheets Directory Name:",
+        "Datasheets directory name",
+        CONFIG_DATASHEETS_DIR_NAME,
+        DEFAULT_DATASHEETS_DIR_NAME,
+        "datasheets_dir_ctrl"
+    )
+)
+
+
+def _load_resource_bitmap(file_name: str, display_width: int, description: str):
+    """
+    @brief Load and scale a PNG image from the plugin resources directory
+
+    @param file_name: Image file name in the plugin resources directory
+    @param display_width: Width of the scaled image in pixels
+    @param description: Human-readable image description for diagnostics
+    @return Scaled wx.Bitmap, or None when the banner cannot be loaded
+    """
+    image_path = os.path.join(
+        os.path.dirname(__file__),
+        "resources",
+        file_name
+    )
+
+    if not os.path.isfile(image_path):
+        print(f"Bakery {description} not found: {image_path}")
+        return None
+
+    image = wx.Image(image_path, wx.BITMAP_TYPE_PNG)
+    if not image.IsOk():
+        print(f"Bakery {description} could not be loaded: {image_path}")
+        return None
+
+    scaled_height = round(
+        image.GetHeight() * display_width / image.GetWidth()
+    )
+    image = image.Scale(
+        display_width,
+        scaled_height,
+        wx.IMAGE_QUALITY_HIGH
+    )
+    return wx.Bitmap(image)
+
+
+def _load_banner_bitmap(file_name: str, display_width: int):
+    """
+    @brief Load and scale a Bakery banner
+
+    @param file_name: Banner image file name in the plugin resources directory
+    @param display_width: Width of the scaled banner in pixels
+    @return Scaled wx.Bitmap, or None when the banner cannot be loaded
+    """
+    return _load_resource_bitmap(file_name, display_width, "banner")
+
+
+def show_completion_dialog(parent, completion_message: str) -> None:
+    """
+    @brief Show the localization completion dialog with support QR code
+
+    @param parent: Parent wx window, or None
+    @param completion_message: Localization summary text
+    """
+    dialog = wx.Dialog(parent, title="Bakery - Success", size=(660, 500))
+    main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+    title_label = wx.StaticText(dialog, label="Localization Complete!")
+    title_font = title_label.GetFont()
+    title_font.SetPointSize(round(title_font.GetPointSize() * 1.8))
+    title_font.SetWeight(wx.FONTWEIGHT_BOLD)
+    title_label.SetFont(title_font)
+    main_sizer.Add(title_label, 0, wx.ALIGN_CENTER | wx.TOP | wx.BOTTOM, 18)
+
+    summary_label = wx.StaticText(dialog, label=completion_message)
+    summary_font = summary_label.GetFont()
+    summary_font.SetPointSize(round(summary_font.GetPointSize() * 1.5))
+    summary_label.SetFont(summary_font)
+    main_sizer.Add(summary_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 25)
+
+    main_sizer.Add(wx.StaticLine(dialog), 0, wx.EXPAND | wx.ALL, 15)
+
+    support_sizer = wx.BoxSizer(wx.HORIZONTAL)
+    qr_bitmap = _load_resource_bitmap(
+        COMPLETION_QR_FILE_NAME,
+        COMPLETION_QR_DISPLAY_WIDTH,
+        "support QR code"
+    )
+    if qr_bitmap is not None:
+        qr_panel = wx.Panel(dialog)
+        qr_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
+        qr_sizer = wx.BoxSizer(wx.VERTICAL)
+        qr_image = wx.StaticBitmap(qr_panel, bitmap=qr_bitmap)
+        qr_sizer.Add(qr_image, 0, wx.ALIGN_CENTER | wx.ALL, 12)
+        qr_panel.SetSizer(qr_sizer)
+        support_sizer.Add(qr_panel, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 10)
+
+    support_text_sizer = wx.BoxSizer(wx.VERTICAL)
+    support_label = wx.StaticText(dialog, label=COMPLETION_SUPPORT_MESSAGE)
+    support_font = support_label.GetFont()
+    support_font.SetPointSize(round(support_font.GetPointSize() * 1.5))
+    support_label.SetFont(support_font)
+    support_label.Wrap(400)
+    support_text_sizer.Add(
+        support_label,
+        0,
+        wx.EXPAND | wx.BOTTOM,
+        12
+    )
+    coffee_button = wx.Button(dialog, label="Buy me a coffee")
+    coffee_button.Bind(
+        wx.EVT_BUTTON,
+        lambda event: webbrowser.open(COMPLETION_SUPPORT_URL)
+    )
+    support_text_sizer.Add(coffee_button, 0, wx.ALIGN_LEFT)
+    support_sizer.Add(
+        support_text_sizer,
+        1,
+        wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+        10
+    )
+    main_sizer.Add(support_sizer, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 25)
+
+    ok_button = wx.Button(dialog, wx.ID_OK, "OK")
+    ok_button.Bind(wx.EVT_BUTTON, lambda event: dialog.EndModal(wx.ID_OK))
+    main_sizer.Add(ok_button, 0, wx.ALIGN_CENTER | wx.ALL, 18)
+
+    dialog.SetSizer(main_sizer)
+    dialog.Centre()
+    try:
+        dialog.ShowModal()
+    finally:
+        dialog.Destroy()
 
 
 class ConfigDialog(wx.Dialog):
@@ -71,6 +241,8 @@ class ConfigDialog(wx.Dialog):
     
     @section methods Methods
     - :py:meth:`~ConfigDialog.__init__`
+    - :py:meth:`~ConfigDialog._add_text_setting`
+    - :py:meth:`~ConfigDialog.on_help`
     - :py:meth:`~ConfigDialog.on_ok`
     - :py:meth:`~ConfigDialog.on_cancel`
     - :py:meth:`~ConfigDialog.get_config`
@@ -96,6 +268,14 @@ class ConfigDialog(wx.Dialog):
         
         # Create main sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        banner_bitmap = _load_banner_bitmap(
+            CONFIG_BANNER_FILE_NAME,
+            CONFIG_BANNER_DISPLAY_WIDTH
+        )
+        if banner_bitmap is not None:
+            banner = wx.StaticBitmap(self, bitmap=banner_bitmap)
+            main_sizer.Add(banner, 0, wx.ALIGN_CENTER | wx.ALL, 5)
         
         # Plugin version
         version_label = wx.StaticText(self, label=f"Bakery v{PLUGIN_VERSION}")
@@ -104,58 +284,20 @@ class ConfigDialog(wx.Dialog):
         version_label.SetFont(version_font)
         main_sizer.Add(version_label, 0, wx.ALL, 5)
         
-        # Footprint library name setting
-        lib_label = wx.StaticText(self, label="Local Footprint Library Name:")
-        main_sizer.Add(lib_label, 0, wx.ALL, 5)
-        
-        self.lib_name_ctrl = wx.TextCtrl(
-            self, 
-            value=config.get(CONFIG_LOCAL_LIB_NAME, DEFAULT_LOCAL_LIB_NAME)
-        )
-        main_sizer.Add(self.lib_name_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
-        
-        # Symbol library name setting
-        sym_lib_label = wx.StaticText(self, label="Symbol Library Name:")
-        main_sizer.Add(sym_lib_label, 0, wx.ALL, 5)
-        
-        self.sym_lib_name_ctrl = wx.TextCtrl(
-            self, 
-            value=config.get(CONFIG_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME)
-        )
-        main_sizer.Add(self.sym_lib_name_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
-        
-        # Symbol directory name setting
-        sym_dir_label = wx.StaticText(self, label="Symbol Directory Name:")
-        main_sizer.Add(sym_dir_label, 0, wx.ALL, 5)
-        
-        self.sym_dir_ctrl = wx.TextCtrl(
-            self, 
-            value=config.get(CONFIG_SYMBOL_DIR_NAME, DEFAULT_SYMBOL_DIR_NAME)
-        )
-        main_sizer.Add(self.sym_dir_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
-        
-        # Models directory name setting
-        models_label = wx.StaticText(self, label="3D Models Directory Name:")
-        main_sizer.Add(models_label, 0, wx.ALL, 5)
-        
-        self.models_dir_ctrl = wx.TextCtrl(
-            self, 
-            value=config.get(CONFIG_MODELS_DIR_NAME, DEFAULT_MODELS_DIR_NAME)
-        )
-        main_sizer.Add(self.models_dir_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
-        
-        # Datasheets directory name setting
-        datasheets_label = wx.StaticText(self, label="Datasheets Directory Name:")
-        main_sizer.Add(datasheets_label, 0, wx.ALL, 5)
-        
-        self.datasheets_dir_ctrl = wx.TextCtrl(
-            self, 
-            value=config.get(CONFIG_DATASHEETS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME)
-        )
-        main_sizer.Add(self.datasheets_dir_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+        for label, _, key, default, attribute_name in CONFIG_FIELD_SPECS:
+            control = self._add_text_setting(
+                main_sizer,
+                label,
+                config.get(key, default)
+            )
+            setattr(self, attribute_name, control)
         
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        help_btn = wx.Button(self, label="Help")
+        help_btn.Bind(wx.EVT_BUTTON, self.on_help)
+        button_sizer.Add(help_btn, 0, wx.ALL, 5)
         
         ok_btn = wx.Button(self, wx.ID_OK, "OK")
         ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
@@ -169,67 +311,54 @@ class ConfigDialog(wx.Dialog):
         
         self.SetSizer(main_sizer)
         self.Centre()
-    
+
+    def _add_text_setting(self, sizer, label: str, value: str):
+        """
+        @brief Add a labeled text setting to the configuration dialog
+
+        @param sizer: Parent wx sizer
+        @param label: Setting label
+        @param value: Initial text value
+        @return Created wx.TextCtrl
+        """
+        setting_label = wx.StaticText(self, label=label)
+        sizer.Add(setting_label, 0, wx.ALL, 5)
+        control = wx.TextCtrl(self, value=value)
+        sizer.Add(
+            control,
+            0,
+            wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            5
+        )
+        return control
+
+    def on_help(self, event):
+        """
+        @brief Open the Bakery GitHub repository in the default browser
+
+        @param event: Button click event
+        """
+        webbrowser.open(PLUGIN_REPOSITORY_URL)
+
     def on_ok(self, event):
         """
         @brief Handle OK button click
         
         @param event: Button click event
         """
-        # Validate inputs
-        lib_name = self.lib_name_ctrl.GetValue().strip()
-        sym_lib_name = self.sym_lib_name_ctrl.GetValue().strip()
-        sym_dir = self.sym_dir_ctrl.GetValue().strip()
-        models_dir = self.models_dir_ctrl.GetValue().strip()
-        datasheets_dir = self.datasheets_dir_ctrl.GetValue().strip()
-        
-        if not validate_library_name(lib_name):
-            wx.MessageBox(
-                "Footprint library name is empty or contains invalid characters",
-                "Validation Error",
-                wx.OK | wx.ICON_ERROR
-            )
-            return
-        
-        if not validate_library_name(sym_lib_name):
-            wx.MessageBox(
-                "Symbol library name is empty or contains invalid characters",
-                "Validation Error",
-                wx.OK | wx.ICON_ERROR
-            )
-            return
-        
-        if not validate_library_name(sym_dir):
-            wx.MessageBox(
-                "Symbol directory name is empty or contains invalid characters",
-                "Validation Error",
-                wx.OK | wx.ICON_ERROR
-            )
-            return
-        
-        if not validate_library_name(models_dir):
-            wx.MessageBox(
-                "3D models directory name is empty or contains invalid characters",
-                "Validation Error",
-                wx.OK | wx.ICON_ERROR
-            )
-            return
-        
-        if not validate_library_name(datasheets_dir):
-            wx.MessageBox(
-                "Datasheets directory name is empty or contains invalid characters",
-                "Validation Error",
-                wx.OK | wx.ICON_ERROR
-            )
-            return
-        
-        # Update config
-        self.config[CONFIG_LOCAL_LIB_NAME] = lib_name
-        self.config[CONFIG_SYMBOL_LIB_NAME] = sym_lib_name
-        self.config[CONFIG_SYMBOL_DIR_NAME] = sym_dir
-        self.config[CONFIG_MODELS_DIR_NAME] = models_dir
-        self.config[CONFIG_DATASHEETS_DIR_NAME] = datasheets_dir
-        self.config[CONFIG_CREATE_BACKUPS] = False
+        updated_values = {}
+        for _, validation_name, key, _, attribute_name in CONFIG_FIELD_SPECS:
+            value = getattr(self, attribute_name).GetValue().strip()
+            if not validate_library_name(value):
+                wx.MessageBox(
+                    f"{validation_name} is empty or contains invalid characters",
+                    "Validation Error",
+                    wx.OK | wx.ICON_ERROR
+                )
+                return
+            updated_values[key] = value
+
+        self.config.update(updated_values)
         
         self.EndModal(wx.ID_OK)
     
@@ -284,8 +413,17 @@ class BakeryLogger(wx.Dialog):
         @param title: Dialog window title
         """
         super(BakeryLogger, self).__init__(parent, title=title, size=LOGGER_WINDOW_SIZE)
+
         # Create main sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        banner_bitmap = _load_banner_bitmap(
+            LOGGER_BANNER_FILE_NAME,
+            LOGGER_BANNER_DISPLAY_WIDTH
+        )
+        if banner_bitmap is not None:
+            banner = wx.StaticBitmap(self, bitmap=banner_bitmap)
+            main_sizer.Add(banner, 0, wx.ALIGN_CENTER | wx.ALL, 5)
         
         # Progress bar
         self.progress_label = wx.StaticText(self, label="Initializing...")

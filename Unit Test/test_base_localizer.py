@@ -62,7 +62,6 @@ class TestBaseLocalizer(unittest.TestCase):
         localizer = BaseLocalizer()
         self.assertIsNotNone(localizer)
         self.assertIsNotNone(localizer.parser)
-        self.assertIsNotNone(localizer.backup_manager)
     
     def test_initialization_with_logger(self):
         """Test BaseLocalizer initialization with logger"""
@@ -124,6 +123,17 @@ class TestBaseLocalizer(unittest.TestCase):
             # So we just test that the method doesn't crash
             is_locked = self.localizer.is_file_locked(test_file)
             self.assertIsInstance(is_locked, bool)
+
+    def test_is_file_locked_detects_kicad_lock_file(self):
+        """Test that KiCad sidecar lock files block modification"""
+        test_file = os.path.join(self.temp_dir, "locked.kicad_sch")
+        lock_file = os.path.join(self.temp_dir, "~locked.kicad_sch.lck")
+        with open(test_file, 'w', encoding='utf-8') as schematic:
+            schematic.write("(kicad_sch)")
+        with open(lock_file, 'w', encoding='utf-8') as lock:
+            lock.write("locked")
+
+        self.assertTrue(self.localizer.is_file_locked(test_file))
     
     def test_find_schematic_files(self):
         """Test finding schematic files in directory"""
@@ -179,9 +189,7 @@ class TestBaseLocalizer(unittest.TestCase):
         replacements = [("OldLib", "NewLib")]
         
         # Update the file
-        result = self.localizer.update_schematic_file(
-            sch_file, replacements, create_backup=False
-        )
+        result = self.localizer.update_schematic_file(sch_file, replacements)
         
         if result:  # If method is implemented
             # Read updated content
@@ -207,6 +215,37 @@ class TestBaseLocalizer(unittest.TestCase):
             self.assertIn(new_ref, updated)
             # Check that old reference is replaced
             # (implementation might preserve some old references)
+
+    def test_update_schematic_rejects_concurrent_change(self):
+        """Test that a file changed after reading is not overwritten"""
+        sch_file = os.path.join(self.project_dir, "changed.kicad_sch")
+        with open(sch_file, 'w', encoding='utf-8') as schematic:
+            schematic.write('(lib_id "OldLib:Symbol")')
+
+        def modify_during_processing(content, replacements):
+            current = os.stat(sch_file)
+            with open(sch_file, 'w', encoding='utf-8') as schematic:
+                schematic.write("external edit")
+            os.utime(
+                sch_file,
+                ns=(
+                    current.st_atime_ns,
+                    current.st_mtime_ns + 1_000_000
+                )
+            )
+            return 1, content.replace("OldLib", "NewLib")
+
+        self.localizer.replace_references_in_content = (
+            modify_during_processing
+        )
+
+        with self.assertRaises(RuntimeError):
+            self.localizer.update_schematic_file(
+                sch_file,
+                [("OldLib", "NewLib")]
+            )
+        with open(sch_file, 'r', encoding='utf-8') as schematic:
+            self.assertEqual(schematic.read(), "external edit")
 
 
 class TestBaseLocalizerEdgeCases(unittest.TestCase):
@@ -256,23 +295,12 @@ class TestBaseLocalizerEdgeCases(unittest.TestCase):
         
         # Should not crash
         try:
-            result = self.localizer.update_schematic_file(
-                sch_file, replace_fn, create_backup=False
-            )
+            result = self.localizer.update_schematic_file(sch_file, replace_fn)
             # Method should return something (True/False/None)
             self.assertTrue(result is not None or result is None)
         except Exception as e:
             # If it raises an exception, it should be handled gracefully
             self.assertIsInstance(e, Exception)
-    
-    def test_backup_manager_integration(self):
-        """Test that backup_manager is properly integrated"""
-        # BaseLocalizer should have a backup_manager
-        self.assertIsNotNone(self.localizer.backup_manager)
-        
-        # backup_manager should be a BackupManager instance
-        backup_mgr_module = import_bakery_module('backup_manager')
-        self.assertIsInstance(self.localizer.backup_manager, backup_mgr_module.BackupManager)
     
     def test_parser_integration(self):
         """Test that parser is properly integrated"""

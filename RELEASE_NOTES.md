@@ -1,5 +1,38 @@
 # Bakery - Release Notes
 
+## v2.1.0 - Portable Project Backups, Datasheets, and Release Validation
+
+### Overview
+This release restores mandatory KiCad-compatible project ZIP backups before
+localization and expands Bakery's portability coverage for KiCad 10 projects.
+It also improves collision-safe localization, datasheet handling, repeat-run
+safety, and automated release validation.
+
+### What's New in v2.1.0
+- **Mandatory KiCad project backups** - Bakery creates a timestamped
+  `<project>-backups/<project>-YYYY-MM-DD_HHMMSS.zip` archive before changing
+  project files. Restore backups with KiCad Project Manager's
+  **File** > **Unarchive Project...** command.
+- **Datasheet localization improvements** - Datasheets are scanned from both
+  schematics and PCB files, TI redirect URLs are resolved before download, and
+  invalid or truncated PDFs are rejected before replacing local files.
+- **Collision-safe local names** - Symbols, footprints, 3D models, and
+  datasheets use stable source-hash naming when needed so same-named external
+  resources do not overwrite each other.
+- **Safer repeat runs** - Already-local symbols, footprints, models, and
+  datasheets remain stable on subsequent Bakery runs.
+- **Stronger functional release tests** - The Windows KiCad 10 functional suite
+  now reopens both the localized PCB and root schematic in KiCad after
+  localization and idempotence checks.
+
+### Compatibility
+- Bakery v2.1.0 targets **KiCad 10.x**.
+- Legacy `${KICAD9_*}` variables in project files are accepted as input and
+  normalized to KiCad 10 equivalents when localizing, but Bakery is not a KiCad
+  8/9 runtime plugin in this release line.
+
+---
+
 ## v2.0.0 - KiCad 10 Support and Backup Policy Update
 
 ### Overview

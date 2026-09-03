@@ -87,8 +87,7 @@ class TestConstants(unittest.TestCase):
             constants.EXTENSION_FOOTPRINT_LIB,
             constants.EXTENSION_SYMBOL,
             constants.EXTENSION_SCHEMATIC,
-            constants.EXTENSION_PCB,
-            constants.BACKUP_SUFFIX
+            constants.EXTENSION_PCB
         ]
         for ext in extensions:
             if ext != constants.EXTENSION_FP_LIB_TABLE and ext != constants.EXTENSION_SYM_LIB_TABLE:
@@ -123,17 +122,6 @@ class TestConstants(unittest.TestCase):
         self.assertIn("KICAD9_", constants.LEGACY_ENV_VAR_PREFIXES)
         self.assertNotIn("KICAD8_", constants.LEGACY_ENV_VAR_PREFIXES)
     
-    def test_backup_timestamp_format_valid(self):
-        """Test that backup timestamp format is valid strftime format"""
-        from datetime import datetime
-        try:
-            # Try to format current time with the timestamp format
-            timestamp = datetime.now().strftime(constants.BACKUP_TIMESTAMP_FORMAT)
-            self.assertIsInstance(timestamp, str)
-            self.assertGreater(len(timestamp), 0)
-        except Exception as e:
-            self.fail(f"BACKUP_TIMESTAMP_FORMAT is not a valid strftime format: {e}")
-    
     def test_sexpr_keywords_are_strings(self):
         """Test that S-expression keywords are strings"""
         keywords = [
@@ -150,7 +138,7 @@ class TestConstants(unittest.TestCase):
             constants.CONFIG_SYMBOL_LIB_NAME,
             constants.CONFIG_SYMBOL_DIR_NAME,
             constants.CONFIG_MODELS_DIR_NAME,
-            constants.CONFIG_CREATE_BACKUPS
+            constants.CONFIG_DATASHEETS_DIR_NAME
         ]
         for key in config_keys:
             self.assertIsInstance(key, str)

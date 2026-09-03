@@ -1,4 +1,4 @@
-"""
+"""!
 Copyright (C) 2026 Adrian West
 
 This program is free software: you can redistribute it and/or modify
@@ -13,9 +13,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-"""!
 @file base_localizer.py
 
 @brief Base class for localization functionality shared between footprint and symbol localizers
@@ -23,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 Provides common functionality for:
 - Logging
 - S-expression parsing
-- Backup management
 - Schematic file handling
 - File lock detection
 
@@ -40,16 +36,20 @@ This eliminates code duplication and ensures consistent behavior.
 
 import os
 import glob
-from typing import Optional, Callable, List
+import sys
+from typing import Callable, List, Optional
 from abc import ABC
 
 from .constants import EXTENSION_SCHEMATIC
-from .sexpr_parser import SExpressionParser
-from .backup_manager import BackupManager
-from .utils import find_schematic_files as _util_find_schematic_files
+from .utils import (
+    ParserLoggerMixin,
+    atomic_write_file,
+    find_schematic_files as _util_find_schematic_files,
+    safe_read_file
+)
 
 
-class BaseLocalizer(ABC):
+class BaseLocalizer(ParserLoggerMixin, ABC):
     """!
     @brief Base class for footprint and symbol localizers
     
@@ -62,36 +62,14 @@ class BaseLocalizer(ABC):
     - :py:meth:`~BaseLocalizer.is_file_locked`
     - :py:meth:`~BaseLocalizer.check_schematic_locks`
     - :py:meth:`~BaseLocalizer.find_schematic_files`
+    - :py:meth:`~BaseLocalizer._ensure_file_unchanged`
     - :py:meth:`~BaseLocalizer.update_schematic_file`
     - :py:meth:`~BaseLocalizer.replace_references_in_content`
     
     @section attributes Attributes
     - logger (Callable): Logger object with info/warning/error methods
     - parser (SExpressionParser): S-expression parser instance
-    - backup_manager (BackupManager): File backup manager instance
     """
-    
-    def __init__(self, logger: Optional[Callable] = None):
-        """
-        @brief Initialize the base localizer
-        
-        @param logger: Optional logger object with info/warning/error methods
-        """
-        self.logger = logger
-        self.parser = SExpressionParser()
-        self.backup_manager = BackupManager(logger, enabled=False)
-    
-    def log(self, level: str, message: str) -> None:
-        """
-        @brief Internal logging helper
-        
-        @param level: Log level (info, warning, error, success)
-        @param message: Message to log
-        """
-        if self.logger:
-            method = getattr(self.logger, level, None)
-            if method:
-                method(message)
     
     def is_file_locked(self, filepath: str) -> bool:
         """
@@ -100,12 +78,36 @@ class BaseLocalizer(ABC):
         @param filepath: Path to file to check
         @return True if file is locked, False otherwise
         """
+        lock_path = os.path.join(
+            os.path.dirname(filepath),
+            f"~{os.path.basename(filepath)}.lck"
+        )
+        if os.path.exists(lock_path):
+            return True
+
         try:
-            # Try to open file in exclusive mode
-            with open(filepath, 'r+', encoding='utf-8') as f:
-                pass
+            with open(filepath, 'r+b') as file_handle:
+                if sys.platform == 'win32':
+                    import msvcrt
+                    msvcrt.locking(
+                        file_handle.fileno(),
+                        msvcrt.LK_NBLCK,
+                        1
+                    )
+                    msvcrt.locking(
+                        file_handle.fileno(),
+                        msvcrt.LK_UNLCK,
+                        1
+                    )
+                else:
+                    import fcntl
+                    fcntl.flock(
+                        file_handle.fileno(),
+                        fcntl.LOCK_EX | fcntl.LOCK_NB
+                    )
+                    fcntl.flock(file_handle.fileno(), fcntl.LOCK_UN)
             return False
-        except (IOError, PermissionError):
+        except (ImportError, OSError):
             return True
     
     def check_schematic_locks(self, project_dir: str) -> List[str]:
@@ -132,44 +134,78 @@ class BaseLocalizer(ABC):
         @return List of schematic file paths (sorted)
         """
         return _util_find_schematic_files(project_dir)
+
+    def _ensure_file_unchanged(
+        self,
+        filepath: str,
+        expected_mtime_ns: int
+    ) -> None:
+        """
+        @brief Ensure a file is unlocked and unchanged before replacement
+
+        @param filepath: File that is about to be replaced
+        @param expected_mtime_ns: Modification timestamp captured before reading
+
+        @throws PermissionError if the file is currently locked
+        @throws RuntimeError if the file changed after it was read
+        """
+        if self.is_file_locked(filepath):
+            raise PermissionError(
+                f"File became locked before it could be updated: {filepath}"
+            )
+        current_mtime_ns = os.stat(filepath).st_mtime_ns
+        if current_mtime_ns != expected_mtime_ns:
+            raise RuntimeError(
+                f"File changed while Bakery was processing it: {filepath}"
+            )
     
-    def update_schematic_file(self, sch_file: str, replacements: List[tuple], 
-                             create_backup: bool = True) -> int:
+    def update_schematic_file(
+        self,
+        sch_file: str,
+        replacements: List[tuple],
+        content_transform: Optional[Callable[[str], tuple]] = None
+    ) -> int:
         """
         @brief Update a schematic file with reference replacements
         
         @param sch_file: Path to schematic file
         @param replacements: List of (old_ref, new_ref) tuples
-        @param create_backup: Whether to create backup before modifying
+        @param content_transform: Optional transformation applied before
+                                 reference replacements
         @return Number of replacements made
         
         @throws IOError if file operations fail
         """
         try:
-            # Create backup if requested
-            if create_backup:
-                self.backup_manager.create_backup(sch_file)
-            
-            # Read the schematic file
-            with open(sch_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
+            if self.is_file_locked(sch_file):
+                raise PermissionError(f"Schematic is locked: {sch_file}")
+            expected_mtime_ns = os.stat(sch_file).st_mtime_ns
+            content = safe_read_file(sch_file)
+
+            transformed_count = 0
+            if content_transform is not None:
+                transformed_count, content = content_transform(content)
+
             # Apply replacements
             updated_count, new_content = self.replace_references_in_content(
                 content, replacements
             )
+            updated_count += transformed_count
             
             # Write back only if changes were made
             if updated_count > 0:
-                with open(sch_file, 'w', encoding='utf-8') as f:
-                    f.write(new_content)
+                self._ensure_file_unchanged(
+                    sch_file,
+                    expected_mtime_ns
+                )
+                atomic_write_file(sch_file, new_content)
                 self.log('info', f"  Updated {updated_count} reference(s) in {os.path.basename(sch_file)}")
             else:
                 self.log('info', f"  No changes needed in {os.path.basename(sch_file)}")
             
             return updated_count
             
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             self.log('error', f"Failed to update {os.path.basename(sch_file)}: {e}")
             raise
     

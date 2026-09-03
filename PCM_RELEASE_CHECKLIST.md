@@ -43,7 +43,6 @@ This checklist covers all steps needed to publish Bakery to the KiCad Plugin and
   │   ├── library_manager.py
   │   ├── sexpr_parser.py
   │   ├── ui_components.py
-  │   ├── backup_manager.py
   │   ├── utils.py
   │   ├── metadata.json
   │   └── resources/

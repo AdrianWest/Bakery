@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "MySymbols") (type "KiCad") (uri "${KIPRJMOD}/MySym/MySymbols.kicad_sym") (options "") (descr "Local project symbol library"))
+)

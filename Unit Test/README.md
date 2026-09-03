@@ -9,7 +9,6 @@ The test suite includes tests for the following modules:
 - **test_constants.py** - Tests for constants and configuration values
 - **test_utils.py** - Tests for utility functions (path validation, file operations)
 - **test_sexpr_parser.py** - Tests for S-expression parsing and serialization
-- **test_backup_manager.py** - Tests for file backup functionality
 - **test_library_manager.py** - Tests for library creation and management
 - **test_base_localizer.py** - Tests for base localizer functionality
 - **test_footprint_localizer.py** - Tests for footprint localization

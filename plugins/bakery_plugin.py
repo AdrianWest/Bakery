@@ -42,6 +42,7 @@ from .constants import (
     ERROR_NO_BOARD, ERROR_PROJECT_NOT_SAVED, CONFIRM_LOCALIZATION,
     CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME, CONFIG_SYMBOL_DIR_NAME,
     CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
+    CONFIG_USE_PARENT_DIR, CONFIG_PARENT_DIR_NAME, DEFAULT_PARENT_DIR_NAME,
     DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME, DEFAULT_SYMBOL_DIR_NAME,
     DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
     PROGRESS_STEP_SCAN_PCB, PROGRESS_STEP_SCAN_SCHEMATICS, PROGRESS_STEP_SCAN_SYMBOLS,
@@ -62,7 +63,7 @@ from .symbol_localizer import SymbolLocalizer
 from .data_sheet_localizer import DataSheetLocalizer
 from .library_manager import LibraryManager
 from .backup_manager import BackupManager
-from .utils import find_schematic_files
+from .utils import find_schematic_files, validate_library_name
 
 
 class BakeryPlugin(pcbnew.ActionPlugin):
@@ -95,7 +96,9 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             CONFIG_SYMBOL_DIR_NAME: DEFAULT_SYMBOL_DIR_NAME,
             CONFIG_LOCAL_LIB_NAME: DEFAULT_LOCAL_LIB_NAME,
             CONFIG_MODELS_DIR_NAME: DEFAULT_MODELS_DIR_NAME,
-            CONFIG_DATASHEETS_DIR_NAME: DEFAULT_DATASHEETS_DIR_NAME
+            CONFIG_DATASHEETS_DIR_NAME: DEFAULT_DATASHEETS_DIR_NAME,
+            CONFIG_USE_PARENT_DIR: False,
+            CONFIG_PARENT_DIR_NAME: DEFAULT_PARENT_DIR_NAME
         }
     
     def defaults(self):
@@ -112,6 +115,22 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.description = PLUGIN_DESCRIPTION
         self.show_toolbar_button = True
         self.icon_file_name = os.path.join(os.path.dirname(__file__), "resources", "Bakery_Icon.png")
+
+    def _parent_directory(self) -> str:
+        """Return the selected parent folder, or the project root."""
+        if not self.config.get(CONFIG_USE_PARENT_DIR, False):
+            return ""
+        name = self.config.get(CONFIG_PARENT_DIR_NAME, DEFAULT_PARENT_DIR_NAME).strip()
+        if not validate_library_name(name) or name in (".", "..") or name.endswith("."):
+            raise ValueError(f"Invalid parent folder name: {name}")
+        return name
+
+    def _output_directory(self, config_key: str) -> str:
+        """Build a portable path to a selected output folder."""
+        return "/".join(
+            part for part in (self._parent_directory(), self.config[config_key])
+            if part
+        )
     
     def Run(self):
         """
@@ -206,6 +225,9 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         """
         self.logger.info("Starting localization process...")
         self.logger.info(f"Project: {project_path}")
+        parent_directory = self._parent_directory()
+        if parent_directory:
+            self.logger.info(f"Library folders will be created in: {parent_directory}")
         self.logger.info(f"Configuration: Library={self.config[CONFIG_LOCAL_LIB_NAME]}, "
                         f"Symbols={self.config[CONFIG_SYMBOL_LIB_NAME]}, "
                         f"Models={self.config[CONFIG_MODELS_DIR_NAME]}, "
@@ -250,7 +272,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         fp_localizer.update_pcb_model_paths(
             project_path,
             project_dir,
-            self.config[CONFIG_MODELS_DIR_NAME]
+            self._output_directory(CONFIG_MODELS_DIR_NAME)
         )
 
         self._complete_localization(
@@ -323,7 +345,8 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             copied_footprints = fp_localizer.copy_footprints(
                 all_footprints,
                 project_dir,
-                self.config[CONFIG_LOCAL_LIB_NAME]
+                self.config[CONFIG_LOCAL_LIB_NAME],
+                self._parent_directory()
             )
 
         if not copied_footprints:
@@ -334,12 +357,13 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         fp_localizer.localize_3d_models(
             copied_footprints,
             project_dir,
-            self.config[CONFIG_MODELS_DIR_NAME]
+            self._output_directory(CONFIG_MODELS_DIR_NAME)
         )
         self.logger.set_progress(PROGRESS_PCT_UPDATE_LIB_TABLE, PROGRESS_BAR_RANGE, PROGRESS_STEP_UPDATE_LIB_TABLE)
         if not lib_manager.update_fp_lib_table(
             project_dir,
-            self.config[CONFIG_LOCAL_LIB_NAME]
+            self.config[CONFIG_LOCAL_LIB_NAME],
+            self._parent_directory()
         ):
             raise RuntimeError(
                 "Footprint library table update failed; references were not changed"
@@ -383,7 +407,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
             all_symbols,
             project_dir,
             self.config[CONFIG_SYMBOL_LIB_NAME],
-            self.config[CONFIG_SYMBOL_DIR_NAME]
+            self._output_directory(CONFIG_SYMBOL_DIR_NAME)
         )
         if not copied_symbols:
             self.logger.info("No symbols to copy")
@@ -393,7 +417,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         if not sym_localizer.update_sym_lib_table(
             project_dir,
             self.config[CONFIG_SYMBOL_LIB_NAME],
-            self.config[CONFIG_SYMBOL_DIR_NAME]
+            self._output_directory(CONFIG_SYMBOL_DIR_NAME)
         ):
             raise RuntimeError(
                 "Symbol library table update failed; references were not changed"
@@ -421,7 +445,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
 
         symbol_lib_path = os.path.join(
             project_dir,
-            self.config[CONFIG_SYMBOL_DIR_NAME],
+            self._output_directory(CONFIG_SYMBOL_DIR_NAME),
             f"{self.config[CONFIG_SYMBOL_LIB_NAME]}.kicad_sym"
         )
         symbol_libs = [symbol_lib_path] if os.path.exists(symbol_lib_path) else []
@@ -430,7 +454,7 @@ class BakeryPlugin(pcbnew.ActionPlugin):
         self.logger.info("Starting datasheet localization...")
         datasheet_localizer = DataSheetLocalizer(
             project_dir,
-            self.config[CONFIG_DATASHEETS_DIR_NAME],
+            self._output_directory(CONFIG_DATASHEETS_DIR_NAME),
             self.logger
         )
         processed, files_updated = datasheet_localizer.localize_all_datasheets(

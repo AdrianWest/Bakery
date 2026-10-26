@@ -5,6 +5,16 @@ All notable changes to the Bakery KiCad plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-10-25
+
+### Added
+- Added an option to place the footprint, symbol, 3D model, and datasheet folders inside one parent folder.
+- Added a parent-folder name field that appears when grouping is enabled, defaulting to `Project_Lib`.
+
+### Changed
+- Updated KiCad library tables, model paths, and datasheet references to use the selected parent folder.
+- Preserved project-root source-library resolution when copying footprints into a grouped folder.
+
 ## [2.1.0] - 2026-08-22
 
 ### Added

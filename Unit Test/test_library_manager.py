@@ -100,6 +100,25 @@ class TestLibraryManager(unittest.TestCase):
         
         if result:
             self.assertTrue(os.path.exists(result))
+
+    def test_grouped_footprint_library_and_table_resolve_to_same_folder(self):
+        """Grouping changes the library location while preserving its nickname."""
+        lib_path = self.lib_mgr.create_local_footprint_library(
+            self.project_dir, "MyLib", "Project_Lib"
+        )
+        self.assertEqual(
+            lib_path, os.path.join(self.project_dir, "Project_Lib", "MyLib.pretty")
+        )
+        self.assertTrue(os.path.isdir(lib_path))
+        self.assertTrue(self.lib_mgr.update_fp_lib_table(
+            self.project_dir, "MyLib", "Project_Lib"
+        ))
+        self.assertEqual(
+            os.path.normpath(self.lib_mgr.find_footprint_library_path(
+                "MyLib", self.project_dir
+            )),
+            os.path.normpath(lib_path)
+        )
     
     def test_expand_path_with_kiprjmod(self):
         """Test expanding path with ${KIPRJMOD}"""

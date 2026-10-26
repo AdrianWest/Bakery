@@ -7,6 +7,7 @@ Tests the main BakeryPlugin ActionPlugin class.
 import sys
 import os
 import types
+import tempfile
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 
@@ -182,6 +183,63 @@ class TestBakeryPlugin(unittest.TestCase):
         """Test that the removed backup option is absent from plugin config."""
         plugin = load_bakery_plugin_module().BakeryPlugin()
         self.assertNotIn('create_backups', plugin.config)
+
+    def test_parent_folder_routes_all_library_outputs(self):
+        """Default, custom, and disabled grouping preserve project source paths."""
+        module = load_bakery_plugin_module()
+        for enabled, name, prefix in (
+            (True, "Project_Lib", "Project_Lib/"),
+            (True, "Project Assets", "Project Assets/"),
+            (False, "Project_Lib", "")
+        ):
+            with self.subTest(enabled=enabled, name=name), tempfile.TemporaryDirectory() as project:
+                plugin = module.BakeryPlugin()
+                plugin.logger = MagicMock()
+                plugin.config.update(use_parent_dir=enabled, parent_dir_name=name)
+                footprints = MagicMock()
+                footprints.scan_pcb_footprints.return_value = {("Source", "Part")}
+                footprints.scan_schematic_footprints.return_value = set()
+                footprints.copy_footprints.return_value = [("Source", "Part")]
+                libraries = MagicMock()
+                symbols = MagicMock()
+                symbols.scan_schematic_symbols.return_value = {("Source", "Part")}
+                symbols.copy_symbols.return_value = [("Source", "Part")]
+                board = MagicMock()
+                parent = name if enabled else ""
+
+                plugin._localize_footprints(
+                    board, "board.kicad_pcb", project, footprints, libraries
+                )
+                footprints.copy_footprints.assert_called_once_with(
+                    {("Source", "Part")}, project, "MyLib", parent
+                )
+                libraries.update_fp_lib_table.assert_called_once_with(
+                    project, "MyLib", parent
+                )
+                footprints.localize_3d_models.assert_called_once_with(
+                    footprints.copy_footprints.return_value, project, prefix + "3D Models"
+                )
+
+                plugin._localize_symbols(project, symbols)
+                symbols.copy_symbols.assert_called_once_with(
+                    {("Source", "Part")}, project, "MySymbols", prefix + "MySym"
+                )
+                symbols.update_sym_lib_table.assert_called_once_with(
+                    project, "MySymbols", prefix + "MySym"
+                )
+
+                symbol_path = os.path.join(project, prefix + "MySym", "MySymbols.kicad_sym")
+                os.makedirs(os.path.dirname(symbol_path))
+                with open(symbol_path, "w") as symbol_file:
+                    symbol_file.write("(kicad_symbol_lib)")
+                datasheets = MagicMock()
+                datasheets.localize_all_datasheets.return_value = (0, 0)
+                with patch.object(module, 'DataSheetLocalizer', return_value=datasheets) as factory:
+                    plugin._localize_datasheets(project, board)
+                factory.assert_called_once_with(project, prefix + "Data_Sheets", plugin.logger)
+                datasheets.localize_all_datasheets.assert_called_once_with(
+                    [symbol_path], [], board=board
+                )
 
     def test_footprint_table_failure_stops_reference_updates(self):
         """Reference rewrites do not run after fp-lib-table failure"""

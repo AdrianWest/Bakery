@@ -1,5 +1,14 @@
 # Bakery - Release Notes
 
+## v2.2.0 - Group Library Folders
+
+- Added **Place all library folders inside one folder** to the startup configuration dialog.
+- Checking the option reveals **Parent Folder Name**, defaulting to `Project_Lib`.
+- Footprint, symbol, 3D model, and datasheet folders use the chosen parent folder, with portable KiCad references updated accordingly.
+- Grouping is optional and disabled by default. Requires **KiCad 10.x**.
+
+---
+
 ## v2.1.0 - Portable Project Backups, Datasheets, and Release Validation
 
 ### Overview

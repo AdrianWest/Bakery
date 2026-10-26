@@ -60,6 +60,7 @@ from .constants import (
     PLUGIN_VERSION, PLUGIN_REPOSITORY_URL, CONFIG_DIALOG_SIZE,
     CONFIG_LOCAL_LIB_NAME, CONFIG_SYMBOL_LIB_NAME,
     CONFIG_SYMBOL_DIR_NAME, CONFIG_MODELS_DIR_NAME, CONFIG_DATASHEETS_DIR_NAME,
+    CONFIG_USE_PARENT_DIR, CONFIG_PARENT_DIR_NAME, DEFAULT_PARENT_DIR_NAME,
     DEFAULT_LOCAL_LIB_NAME, DEFAULT_SYMBOL_LIB_NAME,
     DEFAULT_SYMBOL_DIR_NAME, DEFAULT_MODELS_DIR_NAME, DEFAULT_DATASHEETS_DIR_NAME,
     LOGGER_WINDOW_SIZE, LOG_FONT_SIZE, COLOR_WARNING_BG, COLOR_ERROR_BG,
@@ -291,6 +292,23 @@ class ConfigDialog(wx.Dialog):
                 config.get(key, default)
             )
             setattr(self, attribute_name, control)
+
+        self.parent_dir_checkbox = wx.CheckBox(
+            self, label="Place all library folders inside one folder"
+        )
+        self.parent_dir_checkbox.SetValue(config.get(CONFIG_USE_PARENT_DIR, False))
+        self.parent_dir_checkbox.Bind(wx.EVT_CHECKBOX, self.on_parent_dir_toggle)
+        main_sizer.Add(self.parent_dir_checkbox, 0, wx.ALL, 5)
+
+        self.parent_dir_label = wx.StaticText(self, label="Parent Folder Name:")
+        main_sizer.Add(self.parent_dir_label, 0, wx.ALL, 5)
+        self.parent_dir_ctrl = wx.TextCtrl(
+            self, value=config.get(CONFIG_PARENT_DIR_NAME, DEFAULT_PARENT_DIR_NAME)
+        )
+        main_sizer.Add(
+            self.parent_dir_ctrl, 0,
+            wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5
+        )
         
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -310,7 +328,16 @@ class ConfigDialog(wx.Dialog):
         main_sizer.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
         
         self.SetSizer(main_sizer)
+        self.on_parent_dir_toggle(None)
         self.Centre()
+
+    def on_parent_dir_toggle(self, event):
+        """Show the parent folder setting only when grouping is enabled."""
+        enabled = self.parent_dir_checkbox.GetValue()
+        self.parent_dir_label.Show(enabled)
+        self.parent_dir_ctrl.Show(enabled)
+        self.GetSizer().Fit(self)
+        self.Layout()
 
     def _add_text_setting(self, sizer, label: str, value: str):
         """
@@ -357,6 +384,22 @@ class ConfigDialog(wx.Dialog):
                 )
                 return
             updated_values[key] = value
+
+        use_parent_dir = self.parent_dir_checkbox.GetValue()
+        parent_dir_name = self.parent_dir_ctrl.GetValue().strip()
+        if use_parent_dir and (
+            not validate_library_name(parent_dir_name)
+            or parent_dir_name in (".", "..")
+            or parent_dir_name.endswith(".")
+        ):
+            wx.MessageBox(
+                "Parent folder name is empty or contains invalid characters",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR
+            )
+            return
+        updated_values[CONFIG_USE_PARENT_DIR] = use_parent_dir
+        updated_values[CONFIG_PARENT_DIR_NAME] = parent_dir_name
 
         self.config.update(updated_values)
         

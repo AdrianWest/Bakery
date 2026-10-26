@@ -126,6 +126,8 @@ names in your KiCad project folder.
 | **Symbol Directory Name** | A folder name, such as `MySym` or `Symbols` | The folder that stores the local symbol library file |
 | **3D Models Directory Name** | A folder name, such as `3D Models` | The folder that stores copied STEP/WRL model files |
 | **Datasheets Directory Name** | A folder name, such as `Data_Sheets` | The folder that stores downloaded or copied PDF datasheets |
+| **Place all library folders inside one folder** | Check to group the output folders | Places the footprint, symbol, 3D model, and datasheet folders inside a single folder in the project |
+| **Parent Folder Name** | A folder name (default: `Project_Lib`); shown when grouping is checked | The parent folder containing all the library folders |
 
 Click **OK** to start localization, **Cancel** to exit without changes, or
 **Help** to open the Bakery GitHub repository.
@@ -270,8 +272,9 @@ Please note that this project is released with a [Code of Conduct](CODE_OF_CONDU
 
 ## Roadmap
 
-### Version 2.1.0 - Current Release
+### Version 2.2.0 - Current Release
 
+- [x] Optional grouping of library folders inside a named parent folder (default: `Project_Lib`)
 - [x] KiCad 10 project support, including projects that still reference 9.x global libraries
 - [x] Localization of symbols, footprints, 3D models, and datasheets into project-local libraries
 - [x] Collision-safe local names and filenames for symbols, footprints, 3D models, and datasheets

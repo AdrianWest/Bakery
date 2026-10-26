@@ -40,7 +40,7 @@ to maintain consistency and simplify maintenance.
 
 
 # Plugin metadata
-PLUGIN_VERSION = "2.1.0"
+PLUGIN_VERSION = "2.2.0"
 PLUGIN_NAME = "Bakery - Localize Symbols, Footprints, and 3D Models"
 PLUGIN_CATEGORY = "Library Management"
 PLUGIN_DESCRIPTION = "Localize all symbols and footprints to project libraries"
@@ -110,6 +110,7 @@ DEFAULT_SYMBOL_LIB_NAME = "MySymbols"
 DEFAULT_SYMBOL_DIR_NAME = "MySym"
 DEFAULT_MODELS_DIR_NAME = "3D Models"
 DEFAULT_DATASHEETS_DIR_NAME = "Data_Sheets"
+DEFAULT_PARENT_DIR_NAME = "Project_Lib"
 
 # KiCad-compatible project ZIP backups
 PROJECT_BACKUP_DIRECTORY_SUFFIX = "-backups"
@@ -200,3 +201,5 @@ CONFIG_SYMBOL_LIB_NAME = "symbol_lib_name"
 CONFIG_SYMBOL_DIR_NAME = "symbol_dir_name"
 CONFIG_MODELS_DIR_NAME = "models_dir_name"
 CONFIG_DATASHEETS_DIR_NAME = "datasheets_dir_name"
+CONFIG_USE_PARENT_DIR = "use_parent_dir"
+CONFIG_PARENT_DIR_NAME = "parent_dir_name"

@@ -151,7 +151,8 @@ class FootprintLocalizer(BaseLocalizer):
         lib_name: str,
         fp_name: str,
         target_name: str,
-        local_lib_path: str
+        local_lib_path: str,
+        project_dir: Optional[str] = None
     ) -> Optional[Tuple[str, str, str, str, str]]:
         """
         @brief Find and copy a single footprint to local library
@@ -160,11 +161,14 @@ class FootprintLocalizer(BaseLocalizer):
         @param fp_name: Footprint name
         @param target_name: Collision-safe name in the local library
         @param local_lib_path: Destination local library path
+        @param project_dir: Project root used to resolve source library tables
         @return Tuple of source library, source name, target name, source path,
                 and destination path if successful, otherwise None
         """
         # Find source footprint path
-        lib_path = self.lib_manager.find_footprint_library_path(lib_name, os.path.dirname(local_lib_path))
+        lib_path = self.lib_manager.find_footprint_library_path(
+            lib_name, project_dir or os.path.dirname(local_lib_path)
+        )
         
         if not lib_path:
             self.log('warning', f"✗ Could not find library: {lib_name}")
@@ -230,7 +234,8 @@ class FootprintLocalizer(BaseLocalizer):
         self,
         footprints: Set[Tuple[str, str]],
         project_dir: str,
-        local_lib_name: str
+        local_lib_name: str,
+        parent_dir_name: str = ""
     ) -> List[Tuple[str, str, str, str, str]]:
         """
         @brief Copy footprints to local library
@@ -238,6 +243,7 @@ class FootprintLocalizer(BaseLocalizer):
         @param footprints: Set of (library, footprint) tuples to copy
         @param project_dir: Project directory path
         @param local_lib_name: Name of local library
+        @param parent_dir_name: Optional parent folder relative to the project
         @return List of source library, source name, target name, source path,
                 and destination path tuples
         """
@@ -245,7 +251,7 @@ class FootprintLocalizer(BaseLocalizer):
         
         # Create local library
         local_lib_path = self.lib_manager.create_local_footprint_library(
-            project_dir, local_lib_name)
+            project_dir, local_lib_name, parent_dir_name)
         
         # Filter out footprints already in local library
         footprints_to_copy = self.filter_footprints_to_copy(footprints, local_lib_name)
@@ -262,7 +268,8 @@ class FootprintLocalizer(BaseLocalizer):
                     lib_name,
                     fp_name,
                     target_name,
-                    local_lib_path
+                    local_lib_path,
+                    project_dir
                 )
                 if result:
                     copied_footprints.append(result)

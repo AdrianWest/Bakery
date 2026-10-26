@@ -84,12 +84,15 @@ class LibraryManager(ParserLoggerMixin):
         """
         return expand_kicad_path(path, project_dir)
     
-    def create_local_footprint_library(self, project_dir: str, lib_name: str) -> str:
+    def create_local_footprint_library(
+        self, project_dir: str, lib_name: str, parent_dir_name: str = ""
+    ) -> str:
         """
         @brief Create a local footprint library folder
         
         @param project_dir: Project directory path
         @param lib_name: Library name (without .pretty extension)
+        @param parent_dir_name: Optional parent folder relative to the project
         @return Path to created library
         
         @throws ValueError if library name is invalid
@@ -99,8 +102,9 @@ class LibraryManager(ParserLoggerMixin):
         if not validate_library_name(lib_name):
             raise ValueError(f"Invalid library name: {lib_name}")
         
-        lib_path = os.path.join(project_dir, f"{lib_name}{EXTENSION_FOOTPRINT_LIB}")
-        old_path = os.path.join(project_dir, lib_name)
+        output_dir = os.path.join(project_dir, parent_dir_name)
+        lib_path = os.path.join(output_dir, f"{lib_name}{EXTENSION_FOOTPRINT_LIB}")
+        old_path = os.path.join(output_dir, lib_name)
         
         # Validate paths are within project directory
         if not validate_path_safety(lib_path, project_dir):
@@ -136,20 +140,27 @@ class LibraryManager(ParserLoggerMixin):
             project_dir
         )
     
-    def update_fp_lib_table(self, project_dir: str, lib_name: str) -> bool:
+    def update_fp_lib_table(
+        self, project_dir: str, lib_name: str, parent_dir_name: str = ""
+    ) -> bool:
         """
         @brief Add local library to project's fp-lib-table
         
         @param project_dir: Project directory path
         @param lib_name: Library name to add
+        @param parent_dir_name: Optional parent folder relative to the project
         @return True if successful, False otherwise
         """
         self.log('info', "Updating project fp-lib-table...")
+        relative_path = "/".join(
+            part for part in (parent_dir_name, f"{lib_name}{EXTENSION_FOOTPRINT_LIB}")
+            if part
+        )
         return update_library_table(
             os.path.join(project_dir, EXTENSION_FP_LIB_TABLE),
             SEXPR_FP_LIB_TABLE,
             lib_name,
-            f"${{{ENV_VAR_KIPRJMOD}}}/{lib_name}{EXTENSION_FOOTPRINT_LIB}",
+            f"${{{ENV_VAR_KIPRJMOD}}}/{relative_path}",
             self.parser,
             self.logger,
             "Local project library"

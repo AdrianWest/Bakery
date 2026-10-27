@@ -93,6 +93,14 @@ Bakery is a KiCad plugin that automates the process of copying global library sy
 > release, [v1.1.0](https://github.com/AdrianWest/Bakery/releases/tag/v1.1.0),
 > instead of the current release.
 
+### Uninstalling on Windows
+
+For a manual installation, close KiCad and run `uninstall.bat` from this
+repository. It removes `%USERPROFILE%\Documents\KiCad\10.0\scripting\plugins\Bakery`.
+Use `uninstall.bat /NonInteractive` (or `/Q`) to skip the final pause.
+Project libraries and backups are preserved. For installations managed by
+KiCad's **Plugin and Content Manager**, uninstall Bakery through that manager.
+
 ## How To Use Bakery
 
 ### 1. Prepare Your Project

@@ -1,0 +1,125 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+// Keep the GitHub Pages layout readable on a black background.
+html {
+  color-scheme: dark;
+  background-color: #000;
+}
+
+body,
+.markdown-body {
+  color: #e6edf3;
+  background-color: #000;
+}
+
+.markdown-body a {
+  color: #79c0ff;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body table th,
+.markdown-body table td {
+  border-color: #30363d;
+}
+
+.markdown-body h6,
+.markdown-body blockquote {
+  color: #b1bac4;
+}
+
+.markdown-body blockquote {
+  border-left-color: #484f58;
+}
+
+.markdown-body hr {
+  background-color: #30363d;
+  border-color: #30363d;
+}
+
+.markdown-body table tr {
+  background-color: #000;
+  border-top-color: #30363d;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background-color: #111;
+}
+
+.markdown-body code,
+.markdown-body tt,
+.markdown-body pre,
+.markdown-body .highlight,
+.markdown-body .highlight pre {
+  color: #e6edf3;
+  background-color: #161b22;
+}
+
+.markdown-body pre code,
+.markdown-body pre tt {
+  background-color: transparent;
+}
+
+// The theme's syntax colors target white backgrounds; use light variants.
+.highlight .c, .highlight .c1, .highlight .cd, .highlight .cm,
+.highlight .cp, .highlight .cs, .highlight .bp, .highlight .w {
+  color: #b1bac4;
+}
+
+.highlight .k, .highlight .kc, .highlight .kd, .highlight .kn,
+.highlight .kp, .highlight .kr, .highlight .kt, .highlight .kv,
+.highlight .o, .highlight .ow {
+  color: #ff7b72;
+}
+
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sb,
+.highlight .sc, .highlight .sd, .highlight .se, .highlight .sh,
+.highlight .si, .highlight .sr, .highlight .ss, .highlight .sx {
+  color: #a5d6ff;
+}
+
+.highlight .m, .highlight .mb, .highlight .mf, .highlight .mh,
+.highlight .mi, .highlight .mo, .highlight .mx,
+.highlight .il, .highlight .nb, .highlight .no,
+.highlight .nv, .highlight .vc, .highlight .vg, .highlight .vi,
+.highlight .nt {
+  color: #79c0ff;
+}
+
+.highlight .na, .highlight .nc, .highlight .nd, .highlight .ni,
+.highlight .ne, .highlight .nf, .highlight .nl, .highlight .nn {
+  color: #d2a8ff;
+}
+
+.highlight .gd, .highlight .gr, .highlight .gt, .highlight .err {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+.highlight .gi {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.highlight .gh, .highlight .go, .highlight .gp, .highlight .gu {
+  color: #b1bac4;
+}
+
+.highlight .ge {
+  color: #e6edf3;
+}
+
+.markdown-body img {
+  background-color: transparent;
+}
+
+.footer.text-gray {
+  color: #b1bac4 !important;
+}
+
+.footer.border-gray-light {
+  border-color: #30363d !important;
+}
